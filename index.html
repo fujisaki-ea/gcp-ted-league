@@ -17,9 +17,6 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-  // ══════════════════════════════════════════
-  //  ★ ここにあなたのFirebase設定を貼り付けてください
-  // ══════════════════════════════════════════
   const firebaseConfig = {
     apiKey: "AIzaSyD-Li0Wdq11eWhkBzfFgOX2ZG9qzodv_94",
     authDomain: "gcp-league-677e9.firebaseapp.com",
@@ -29,7 +26,6 @@
     messagingSenderId: "510463380108",
     appId: "1:510463380108:web:7e052df921d7a07b04c9a9"
   };
-  // ══════════════════════════════════════════
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
@@ -43,31 +39,49 @@
         if(badge){ badge.textContent='✅ 保存済み'; badge.className='sync-badge ok'; badge.style.opacity='1'; setTimeout(()=>{ badge.style.opacity='0'; }, 2000); }
       })
       .catch(err => {
-        console.error('Firebase save error:', err);
         const badge = document.getElementById('sync-badge');
         if(badge){ badge.textContent='❌ 保存失敗'; badge.className='sync-badge err'; badge.style.opacity='1'; }
       });
   };
 
-  // Firebase読み込み＆リアルタイム同期
-  window.fbListen = function(callback) {
-    onValue(dataRef, (snapshot) => {
-      if(snapshot.exists()) {
-        callback(snapshot.val());
-      }
-    });
-  };
+  // onValueで初回データ取得 → オーバーレイを消す → 以降もリアルタイム同期
+  onValue(dataRef, (snapshot) => {
+    const data = snapshot.exists() ? snapshot.val() : {};
+    window._fbLatestData = data;
 
-  // Firebase初回読み込み（1回だけ）
-  // データなし→{}、エラー→undefined を返す
-  window.fbLoad = async function() {
-    try {
-      const snapshot = await get(dataRef);
-      return snapshot.exists() ? snapshot.val() : {};
-    } catch(e) {
-      console.error('Firebase load error:', e);
-      return undefined; // エラーはundefinedで返す
+    // オーバーレイを消す（初回接続完了）
+    const overlay = document.getElementById('fb-connecting-overlay');
+    if(overlay) overlay.style.display = 'none';
+
+    // すでにアプリが起動済みなら即反映
+    if(window._appReady) {
+      if(typeof applyFirebaseData === 'function') {
+        applyFirebaseData(data);
+        renderRobin(); renderHistory(); renderSchedule();
+        renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
+      }
     }
+  }, (error) => {
+    // 接続エラー時
+    const overlay = document.getElementById('fb-connecting-overlay');
+    const retryBtn = document.getElementById('fb-retry-btn');
+    const divs = overlay ? overlay.querySelectorAll('div') : [];
+    if(divs[0]) divs[0].textContent = '⚠️';
+    if(divs[1]) divs[1].textContent = 'CONNECTION FAILED';
+    if(divs[2]) divs[2].textContent = 'サーバーに接続できませんでした';
+    if(retryBtn) retryBtn.style.display = 'inline-block';
+  });
+
+  window.fbSave = function(data) {
+    set(dataRef, data)
+      .then(() => {
+        const badge = document.getElementById('sync-badge');
+        if(badge){ badge.textContent='✅ 保存済み'; badge.className='sync-badge ok'; badge.style.opacity='1'; setTimeout(()=>{ badge.style.opacity='0'; }, 2000); }
+      })
+      .catch(() => {
+        const badge = document.getElementById('sync-badge');
+        if(badge){ badge.textContent='❌ 保存失敗'; badge.className='sync-badge err'; badge.style.opacity='1'; }
+      });
   };
 
   window._firebaseReady = true;
@@ -2862,51 +2876,21 @@ async function init(){
   renderHome();
 
   // Firebase の準備ができてからデータを読み込む
-  const startSync = async () => {
-    if(window.fbLoad) {
-      const badge = document.getElementById('sync-badge');
+  // startSync: Firebaseのリアルタイムリスナーが既にオーバーレイを制御するため
+  // ここではアプリ準備完了フラグを立てて、取得済みデータを反映するだけ
+  const startSync = () => {
+    window._appReady = true;
+    // Firebase接続済みでデータが来ていれば即反映
+    if(window._fbLatestData !== undefined) {
       const overlay = document.getElementById('fb-connecting-overlay');
-      const retryBtn = document.getElementById('fb-retry-btn');
-      if(badge){ badge.textContent='🔄 同期中...'; badge.className='sync-badge'; badge.style.opacity='1'; }
-
-      // タイムアウト付きで読み込み（8秒で諦める）
-      const fbData = await Promise.race([
-        window.fbLoad(),
-        new Promise(resolve => setTimeout(() => resolve(null), 8000))
-      ]);
-
-      if(fbData !== undefined) {
-        // null（DB空）でも接続成功 → オーバーレイを消す
-        if(overlay) overlay.style.display = 'none';
-        if(fbData) {
-          applyFirebaseData(fbData);
-          renderRobin(); renderHistory(); renderSchedule();
-          renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
-        }
-        if(badge){ badge.textContent='✅ 接続完了'; badge.className='sync-badge ok'; badge.style.opacity='1'; setTimeout(()=>{ badge.style.opacity='0'; }, 1500); }
-      } else {
-        // タイムアウト → 再接続ボタンを表示
-        const divs = overlay ? overlay.querySelectorAll('div') : [];
-        if(divs[0]) divs[0].textContent = '⚠️';
-        if(divs[1]) divs[1].textContent = 'CONNECTION FAILED';
-        if(divs[2]) divs[2].textContent = 'サーバーに接続できませんでした';
-        if(retryBtn) retryBtn.style.display = 'inline-block';
-        if(badge){ badge.textContent='❌ 接続失敗'; badge.className='sync-badge err'; badge.style.opacity='1'; }
+      if(overlay) overlay.style.display = 'none';
+      if(window._fbLatestData && Object.keys(window._fbLatestData).length > 0) {
+        applyFirebaseData(window._fbLatestData);
+        renderRobin(); renderHistory(); renderSchedule();
+        renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
       }
     }
     fbSync();
-  };
-
-  window.retryFbConnect = function() {
-    const overlay = document.getElementById('fb-connecting-overlay');
-    const retryBtn = document.getElementById('fb-retry-btn');
-    if(overlay){
-      overlay.querySelector('div:nth-child(1)').textContent = '🔄';
-      overlay.querySelector('div:nth-child(2)').textContent = 'CONNECTING...';
-      overlay.querySelector('div:nth-child(3)').textContent = 'サーバーに接続しています';
-    }
-    if(retryBtn) retryBtn.style.display = 'none';
-    startSync();
   };
 
   if(window._firebaseReady) {
