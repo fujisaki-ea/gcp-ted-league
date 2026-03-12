@@ -2,6 +2,11 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<!-- Firebase高速化：事前接続 -->
+<link rel="preconnect" href="https://www.gstatic.com">
+<link rel="preconnect" href="https://gcp-league-677e9-default-rtdb.asia-southeast1.firebasedatabase.app">
+<link rel="dns-prefetch" href="https://www.gstatic.com">
+<link rel="dns-prefetch" href="https://gcp-league-677e9-default-rtdb.asia-southeast1.firebasedatabase.app">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -54,12 +59,15 @@
   };
 
   // Firebase初回読み込み（1回だけ）
+  // データなし→{}、エラー→undefined を返す
   window.fbLoad = async function() {
     try {
       const snapshot = await get(dataRef);
-      if(snapshot.exists()) return snapshot.val();
-    } catch(e) { console.error('Firebase load error:', e); }
-    return null;
+      return snapshot.exists() ? snapshot.val() : {};
+    } catch(e) {
+      console.error('Firebase load error:', e);
+      return undefined; // エラーはundefinedで返す
+    }
   };
 
   window._firebaseReady = true;
@@ -625,6 +633,20 @@ input[readonly] {
   <div style="text-align:center;margin-bottom:28px;">
     <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--accent);white-space:nowrap;">GCP T.E.D. LEAGUE</div>
     <div style="font-size:10px;color:var(--text2);letter-spacing:3px;margin-top:6px;">SCORE SHEET</div>
+  </div>
+
+  <!-- Firebase接続待ちオーバーレイ -->
+  <div id="fb-connecting-overlay" style="
+    position:absolute;inset:0;background:var(--bg);z-index:10;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;">
+    <div style="font-size:28px;">🔄</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:3px;color:var(--accent);">CONNECTING...</div>
+    <div style="font-size:12px;color:var(--text2);">サーバーに接続しています</div>
+    <button onclick="retryFbConnect()" id="fb-retry-btn" style="
+      display:none;margin-top:8px;padding:10px 24px;
+      background:transparent;border:1px solid var(--border);border-radius:8px;
+      color:var(--text2);font-size:13px;cursor:pointer;
+      font-family:'Noto Sans JP',sans-serif;">🔁 再接続する</button>
   </div>
 
   <!-- ① リーダーログイン -->
@@ -2843,25 +2865,59 @@ async function init(){
   const startSync = async () => {
     if(window.fbLoad) {
       const badge = document.getElementById('sync-badge');
-      if(badge){ badge.textContent='🔄 Firebase接続中...'; badge.className='sync-badge'; badge.style.opacity='1'; }
-      const fbData = await window.fbLoad();
-      if(fbData) {
-        applyFirebaseData(fbData);
-        renderRobin(); renderHistory(); renderSchedule();
-        renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
+      const overlay = document.getElementById('fb-connecting-overlay');
+      const retryBtn = document.getElementById('fb-retry-btn');
+      if(badge){ badge.textContent='🔄 同期中...'; badge.className='sync-badge'; badge.style.opacity='1'; }
+
+      // タイムアウト付きで読み込み（8秒で諦める）
+      const fbData = await Promise.race([
+        window.fbLoad(),
+        new Promise(resolve => setTimeout(() => resolve(null), 8000))
+      ]);
+
+      if(fbData !== undefined) {
+        // null（DB空）でも接続成功 → オーバーレイを消す
+        if(overlay) overlay.style.display = 'none';
+        if(fbData) {
+          applyFirebaseData(fbData);
+          renderRobin(); renderHistory(); renderSchedule();
+          renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
+        }
+        if(badge){ badge.textContent='✅ 接続完了'; badge.className='sync-badge ok'; badge.style.opacity='1'; setTimeout(()=>{ badge.style.opacity='0'; }, 1500); }
+      } else {
+        // タイムアウト → 再接続ボタンを表示
+        const divs = overlay ? overlay.querySelectorAll('div') : [];
+        if(divs[0]) divs[0].textContent = '⚠️';
+        if(divs[1]) divs[1].textContent = 'CONNECTION FAILED';
+        if(divs[2]) divs[2].textContent = 'サーバーに接続できませんでした';
+        if(retryBtn) retryBtn.style.display = 'inline-block';
+        if(badge){ badge.textContent='❌ 接続失敗'; badge.className='sync-badge err'; badge.style.opacity='1'; }
       }
     }
     fbSync();
+  };
+
+  window.retryFbConnect = function() {
+    const overlay = document.getElementById('fb-connecting-overlay');
+    const retryBtn = document.getElementById('fb-retry-btn');
+    if(overlay){
+      overlay.querySelector('div:nth-child(1)').textContent = '🔄';
+      overlay.querySelector('div:nth-child(2)').textContent = 'CONNECTING...';
+      overlay.querySelector('div:nth-child(3)').textContent = 'サーバーに接続しています';
+    }
+    if(retryBtn) retryBtn.style.display = 'none';
+    startSync();
   };
 
   if(window._firebaseReady) {
     startSync();
   } else {
     document.addEventListener('firebaseReady', startSync, { once: true });
-    // 3秒待ってもFirebaseが来なければローカルで動作
     setTimeout(() => {
-      if(!window._firebaseReady) fbSync();
-    }, 3000);
+      if(!window._firebaseReady) {
+        document.addEventListener('firebaseReady', startSync, { once: true });
+      }
+    }, 1000);
   }
 
   // 全角数字→半角 グローバル変換（すべてのinput/textareaに適用）
