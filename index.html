@@ -2145,20 +2145,18 @@ function renderPwChangeRows(){
   const wrap = document.getElementById('pw-change-rows');
   if(!wrap) return;
   const teams = [...D.teams.map(t=>t.name), '__admin__'];
-  wrap.innerHTML = teams.map(name=>{
+  wrap.innerHTML = teams.map((name, idx)=>{
     const label = name==='__admin__' ? '管理者' : name;
-    const sid = name.replace(/[^a-zA-Z0-9]/g,'_');
     return `<div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:6px;align-items:center;">
       <div style="font-size:12px;font-weight:700;">${label}</div>
-      <input type="password" class="no-mb" placeholder="新しいパスワード" id="pw-input-${sid}" style="font-size:13px;">
-      <button class="edit-btn" style="font-size:11px;" onclick="changePassword('${name}')">変更</button>
+      <input type="password" class="no-mb" placeholder="新しいパスワード" id="pw-input-${idx}" style="font-size:13px;">
+      <button class="edit-btn" style="font-size:11px;" onclick="changePassword('${name}', ${idx})">変更</button>
     </div>`;
   }).join('');
 }
 
-function changePassword(teamName){
-  const sid = teamName.replace(/[^a-zA-Z0-9]/g,'_');
-  const input = document.getElementById('pw-input-' + sid);
+function changePassword(teamName, idx){
+  const input = document.getElementById('pw-input-' + idx);
   if(!input || !input.value){ toast('新しいパスワードを入力してください'); return; }
   const newPw = input.value.trim();
   if(newPw.length < 4){ toast('パスワードは4文字以上にしてください'); return; }
