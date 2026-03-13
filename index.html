@@ -2145,6 +2145,11 @@ function renderPwChangeRows(){
   const wrap = document.getElementById('pw-change-rows');
   if(!wrap) return;
   const teams = [...D.teams.map(t=>t.name), '__admin__'];
+  // 再レンダリング前に入力中の値を退避
+  const savedValues = {};
+  wrap.querySelectorAll('input[id^="pw-input-"]').forEach(inp => {
+    if(inp.value) savedValues[inp.id] = inp.value;
+  });
   wrap.innerHTML = teams.map((name, idx)=>{
     const label = name==='__admin__' ? '管理者' : name;
     return `<div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:6px;align-items:center;">
@@ -2153,6 +2158,11 @@ function renderPwChangeRows(){
       <button class="edit-btn" style="font-size:11px;" onclick="changePassword('${name}', ${idx})">変更</button>
     </div>`;
   }).join('');
+  // 退避した値を復元
+  Object.entries(savedValues).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if(el) el.value = val;
+  });
 }
 
 function changePassword(teamName, idx){
