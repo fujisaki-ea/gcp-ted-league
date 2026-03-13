@@ -35,6 +35,7 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   const dataRef = ref(db, 'gcpLeague');
+  const pwRef = ref(db, 'passwords');
 
   // Firebase保存
   window.fbSave = function(data) {
@@ -87,6 +88,62 @@
         const badge = document.getElementById('sync-badge');
         if(badge){ badge.textContent='❌ 保存失敗'; badge.className='sync-badge err'; badge.style.opacity='1'; }
       });
+  };
+
+  // パスワードをSHA-256でハッシュ化
+  async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + 'gcp-ted-salt-2026');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Firebaseからパスワードハッシュを取得して照合
+  window.fbCheckPassword = async function(team, password) {
+    try {
+      const snapshot = await get(pwRef);
+      if(!snapshot.exists()) return false;
+      const passwords = snapshot.val();
+      const storedHash = passwords[team];
+      if(!storedHash) return false;
+      const inputHash = await hashPassword(password);
+      return inputHash === storedHash;
+    } catch(e) {
+      console.error('Password check error:', e);
+      return false;
+    }
+  };
+
+  // パスワードをハッシュ化してFirebaseに保存
+  window.fbSavePassword = async function(team, password) {
+    try {
+      const hash = await hashPassword(password);
+      const snapshot = await get(pwRef);
+      const current = snapshot.exists() ? snapshot.val() : {};
+      current[team] = hash;
+      await set(pwRef, current);
+      return true;
+    } catch(e) {
+      console.error('Password save error:', e);
+      return false;
+    }
+  };
+
+  // 初回：ソースコードのパスワードをFirebaseに移行
+  window.fbMigratePasswords = async function(passwords) {
+    try {
+      const snapshot = await get(pwRef);
+      if(snapshot.exists()) return; // 既に移行済み
+      const hashed = {};
+      for(const [team, pw] of Object.entries(passwords)) {
+        hashed[team] = await hashPassword(pw);
+      }
+      await set(pwRef, hashed);
+      console.log('Passwords migrated to Firebase');
+    } catch(e) {
+      console.error('Migration error:', e);
+    }
   };
 
   window._firebaseReady = true;
@@ -1099,12 +1156,13 @@ let D = {teams:[], matches:[]};
 let currentUser = null;  // {team, isAdmin, isGuest}
 
 // ── パスワード設定 ──
-// パスワード（ローカル管理）
+// パスワードはFirebaseに暗号化して保存（初回のみ移行用に使用）
 let PASSWORDS = {
   'ふじさき':'1234','ハッチ':'1234',
   '¥500バーグ食堂':'1234','デイリー':'1234',
   '__admin__':'1234'
 };
+// ※ 上記は初回移行後はFirebaseのハッシュ値で照合されるため意味を持ちません
 
 
 // ── データ保存 ──
@@ -2105,10 +2163,12 @@ function changePassword(teamName){
   const newPw = input.value.trim();
   if(newPw.length < 4){ toast('パスワードは4文字以上にしてください'); return; }
   const label = teamName==='__admin__' ? '管理者' : teamName;
-  showConfirm('🔐 パスワード変更', `${label} のパスワードを変更しますか？`, ()=>{
+  showConfirm('🔐 パスワード変更', `${label} のパスワードを変更しますか？`, async ()=>{
     PASSWORDS[teamName] = newPw;
-    // パスワードをFirebaseに保存
-    if(window.fbSave) window.fbSave({...JSON.parse(JSON.stringify(D)), passwords: PASSWORDS});
+    if(window.fbSavePassword) {
+      const ok = await window.fbSavePassword(teamName, newPw);
+      if(!ok) { toast('❌ 保存に失敗しました'); return; }
+    }
     toast(`${label} のパスワードを変更しました`); input.value='';
   }, '変更する');
 }
@@ -2138,10 +2198,13 @@ function changeSelfPassword(){
   if(newPw !== newPw2)   { err.textContent = '新しいパスワードが一致しません'; return; }
   if(newPw === current)  { err.textContent = '現在と同じパスワードは使えません'; return; }
 
-  showConfirm('🔑 パスワード変更', `${team} のパスワードを変更しますか？`, ()=>{
+  showConfirm('🔑 パスワード変更', `${team} のパスワードを変更しますか？`, async ()=>{
     PASSWORDS[team] = newPw;
-    // パスワードをFirebaseに保存
-    if(window.fbSave) window.fbSave({...JSON.parse(JSON.stringify(D)), passwords: PASSWORDS});
+    // Firebaseにハッシュ化して保存
+    if(window.fbSavePassword) {
+      const ok = await window.fbSavePassword(team, newPw);
+      if(!ok) { toast('❌ 保存に失敗しました'); return; }
+    }
     document.getElementById('pw-current').value = '';
     document.getElementById('pw-new').value = '';
     document.getElementById('pw-new2').value = '';
@@ -2790,19 +2853,17 @@ function highlightUnentered(){
 // ─────────────────────────────────────────
 //  AUTH
 // ─────────────────────────────────────────
-function doLogin(){
+async function doLogin(){
   const team = document.getElementById('login-team-sel').value;
   const pw   = document.getElementById('login-pw').value;
   const err  = document.getElementById('login-err');
   if(!team){ err.textContent='チームを選択してください'; return; }
   if(!pw)  { err.textContent='パスワードを入力してください'; return; }
-  if(PASSWORDS[team] !== pw){ err.textContent='パスワードが違います'; return; }
 
-  // Firebase未接続なら接続待ちオーバーレイを表示してからログイン
+  // Firebase未接続なら接続待ち
   if(window._fbLatestData === undefined) {
     const overlay = document.getElementById('fb-login-overlay');
     if(overlay) overlay.style.display = 'flex';
-    // 接続完了を待って自動でログイン処理を続行
     const waitAndLogin = setInterval(() => {
       if(window._fbLatestData !== undefined) {
         clearInterval(waitAndLogin);
@@ -2812,6 +2873,24 @@ function doLogin(){
     }, 300);
     return;
   }
+
+  // ローディング表示
+  err.textContent = '🔄 確認中...';
+  const loginBtn = document.querySelector('#login-screen button');
+  if(loginBtn) loginBtn.disabled = true;
+
+  // Firebaseでパスワード照合
+  let ok = false;
+  if(window.fbCheckPassword) {
+    ok = await window.fbCheckPassword(team, pw);
+  } else {
+    // フォールバック（Firebase未接続時）
+    ok = PASSWORDS[team] === pw;
+  }
+
+  if(loginBtn) loginBtn.disabled = false;
+  if(!ok){ err.textContent='パスワードが違います'; return; }
+  err.textContent = '';
   const isAdmin = team === '__admin__';
   currentUser = {team: isAdmin ? null : team, isAdmin, isGuest: false};
   document.getElementById('login-screen').style.display = 'none';
@@ -3016,6 +3095,10 @@ async function init(){
   // ここではアプリ準備完了フラグを立てて、取得済みデータを反映するだけ
   const startSync = () => {
     window._appReady = true;
+    // 初回：パスワードをFirebaseに移行（既に移行済みなら何もしない）
+    if(window.fbMigratePasswords) {
+      window.fbMigratePasswords(PASSWORDS);
+    }
     // Firebase接続済みでデータが来ていれば即反映
     if(window._fbLatestData !== undefined) {
       const overlay = document.getElementById('fb-connecting-overlay');
