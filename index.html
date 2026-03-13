@@ -1156,13 +1156,8 @@ let D = {teams:[], matches:[]};
 let currentUser = null;  // {team, isAdmin, isGuest}
 
 // ── パスワード設定 ──
-// パスワードはFirebaseに暗号化して保存（初回のみ移行用に使用）
-let PASSWORDS = {
-  'ふじさき':'1234','ハッチ':'1234',
-  '¥500バーグ食堂':'1234','デイリー':'1234',
-  '__admin__':'1234'
-};
-// ※ 上記は初回移行後はFirebaseのハッシュ値で照合されるため意味を持ちません
+// パスワードはFirebaseにSHA-256ハッシュで保存・照合
+const PASSWORDS = {}; // 平文パスワードは保持しない
 
 
 // ── データ保存 ──
@@ -1250,7 +1245,7 @@ function applyFirebaseData(data) {
     // 2026年日程は常にローカル版を使う
     D.schedule = [...data.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026];
   }
-  if(data.passwords) PASSWORDS = data.passwords;
+  // PASSWORDS は平文を持たないため data.passwords は無視
   // sessionStorageも更新
   try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
 }
@@ -1295,13 +1290,18 @@ function quickLogin(team){
   setTimeout(()=>document.getElementById('ql-pw').focus(), 200);
   window._quickLoginTeam = team;
 }
-function quickLoginSubmit(){
+async function quickLoginSubmit(){
   const team = window._quickLoginTeam;
   const pw = document.getElementById('ql-pw').value;
-  if(pw !== PASSWORDS[team]){
-    document.getElementById('ql-err').textContent = 'パスワードが違います';
+  const errEl = document.getElementById('ql-err');
+  if(!pw){ errEl.textContent = 'パスワードを入力してください'; return; }
+  errEl.textContent = '🔄 確認中...';
+  const ok = window.fbCheckPassword ? await window.fbCheckPassword(team, pw) : false;
+  if(!ok){
+    errEl.textContent = 'パスワードが違います';
     return;
   }
+  errEl.textContent = '';
   document.getElementById('modal-quick-login').classList.remove('open');
   currentUser = {team, isAdmin:false, isGuest:false};
   const badge = document.getElementById('hdr-login-badge');
@@ -2172,7 +2172,6 @@ function changePassword(teamName, idx){
   if(newPw.length < 4){ toast('パスワードは4文字以上にしてください'); return; }
   const label = teamName==='__admin__' ? '管理者' : teamName;
   showConfirm('🔐 パスワード変更', `${label} のパスワードを変更しますか？`, async ()=>{
-    PASSWORDS[teamName] = newPw;
     if(window.fbSavePassword) {
       const ok = await window.fbSavePassword(teamName, newPw);
       if(!ok) { toast('❌ 保存に失敗しました'); return; }
@@ -2190,7 +2189,7 @@ function togglePwSelf(){
   arrow.textContent   = open ? '▲ 閉じる' : '▼ 開く';
 }
 
-function changeSelfPassword(){
+async function changeSelfPassword(){
   if(!currentUser || currentUser.isAdmin || currentUser.isGuest) return;
   const team    = currentUser.team;
   const current = document.getElementById('pw-current').value;
@@ -2199,16 +2198,19 @@ function changeSelfPassword(){
   const err     = document.getElementById('pw-self-err');
   err.textContent = '';
 
-  if(!current)           { err.textContent = '現在のパスワードを入力してください'; return; }
-  if(PASSWORDS[team] !== current){ err.textContent = '現在のパスワードが違います'; return; }
-  if(!newPw)             { err.textContent = '新しいパスワードを入力してください'; return; }
-  if(newPw.length < 4)   { err.textContent = '4文字以上で入力してください'; return; }
-  if(newPw !== newPw2)   { err.textContent = '新しいパスワードが一致しません'; return; }
-  if(newPw === current)  { err.textContent = '現在と同じパスワードは使えません'; return; }
+  if(!current)         { err.textContent = '現在のパスワードを入力してください'; return; }
+  if(!newPw)           { err.textContent = '新しいパスワードを入力してください'; return; }
+  if(newPw.length < 4) { err.textContent = '4文字以上で入力してください'; return; }
+  if(newPw !== newPw2) { err.textContent = '新しいパスワードが一致しません'; return; }
+
+  // Firebaseでハッシュ照合
+  err.textContent = '🔄 確認中...';
+  const currentOk = window.fbCheckPassword ? await window.fbCheckPassword(team, current) : false;
+  err.textContent = '';
+  if(!currentOk) { err.textContent = '現在のパスワードが違います'; return; }
+  if(newPw === current) { err.textContent = '現在と同じパスワードは使えません'; return; }
 
   showConfirm('🔑 パスワード変更', `${team} のパスワードを変更しますか？`, async ()=>{
-    PASSWORDS[team] = newPw;
-    // Firebaseにハッシュ化して保存
     if(window.fbSavePassword) {
       const ok = await window.fbSavePassword(team, newPw);
       if(!ok) { toast('❌ 保存に失敗しました'); return; }
@@ -2892,8 +2894,8 @@ async function doLogin(){
   if(window.fbCheckPassword) {
     ok = await window.fbCheckPassword(team, pw);
   } else {
-    // フォールバック（Firebase未接続時）
-    ok = PASSWORDS[team] === pw;
+    // Firebase未接続時はログイン不可
+    ok = false;
   }
 
   if(loginBtn) loginBtn.disabled = false;
