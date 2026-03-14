@@ -68,6 +68,7 @@
     if(window._appReady) {
       if(typeof applyFirebaseData === 'function') {
         applyFirebaseData(data);
+        if(typeof checkAutoApproval === 'function') checkAutoApproval();
         renderRobin(); renderHistory(); renderSchedule();
         renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
       }
@@ -1157,7 +1158,7 @@ function statsInput(isCricket, savedVal='') {
 // ─────────────────────────────────────────
 //  DATA
 // ─────────────────────────────────────────
-let D = {teams:[], matches:[]};
+let D = {teams:[], matches:[], pendingMatches:[], rejectedNotifs:[]};
 let currentUser = null;  // {team, isAdmin, isGuest}
 
 // ── パスワード設定 ──
@@ -1239,6 +1240,8 @@ function load(){
   // 2026年日程を常に最新版で上書き
   if(!D.schedule) D.schedule = [];
   D.schedule = [...D.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026];
+  if(!D.pendingMatches) D.pendingMatches = [];
+  if(!D.rejectedNotifs) D.rejectedNotifs = [];
 }
 
 function applyFirebaseData(data) {
@@ -1250,6 +1253,8 @@ function applyFirebaseData(data) {
     // 2026年日程は常にローカル版を使う
     D.schedule = [...data.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026];
   }
+  D.pendingMatches = data.pendingMatches || [];
+  D.rejectedNotifs = data.rejectedNotifs || [];
   // PASSWORDS は平文を持たないため data.passwords は無視
   // sessionStorageも更新
   try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
@@ -1265,11 +1270,14 @@ function fbSync(){
       {name:'デイリー',       players:[{name:'',rating:''},{name:'',rating:''},{name:'',rating:''},{name:'',rating:''}]},
     ];
   }
+  if(!D.pendingMatches) D.pendingMatches = [];
+  if(!D.rejectedNotifs) D.rejectedNotifs = [];
 
   // Firebaseからリアルタイム同期を開始
   if(window.fbListen) {
     window.fbListen((data) => {
       applyFirebaseData(data);
+      checkAutoApproval();
       renderRobin(); renderHistory(); renderSchedule();
       renderTeams();
       refreshTeamSelects(); refreshStatsTeamSel();
@@ -1278,6 +1286,7 @@ function fbSync(){
       if(badge){ badge.textContent='🔄 同期済み'; badge.className='sync-badge ok'; badge.style.opacity='1'; setTimeout(()=>{ badge.style.opacity='0'; }, 1500); }
     });
   } else {
+    checkAutoApproval();
     renderRobin(); renderHistory(); renderSchedule();
     renderTeams();
     refreshTeamSelects(); refreshStatsTeamSel();
@@ -1459,13 +1468,97 @@ function renderHome(){
     robinHtml = '<div style="color:var(--text2);font-size:13px;padding:8px 0;">まだ試合結果がありません</div>';
   }
 
+  // ── 承認待ち・却下通知カード ──
+  let pendingCardHtml = '';
+  if(currentUser && !currentUser.isGuest){
+    const pending = D.pendingMatches || [];
+    const notifs = D.rejectedNotifs || [];
+    const myTeam = team;
+    const isAdmin = currentUser.isAdmin;
+
+    // 却下通知（自チームへの通知）
+    const myNotifs = isAdmin ? [] : notifs.filter(n=>n.teamX===myTeam||n.teamY===myTeam);
+    const notifsHtml = myNotifs.map(n=>`
+      <div style="background:rgba(240,51,85,.08);border:1px solid rgba(240,51,85,.3);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:700;color:var(--lose);">❌ 申請が却下されました</div>
+        <div style="font-size:12px;margin-top:4px;">${n.date}　${n.teamX} vs ${n.teamY}</div>
+        <button onclick="dismissRejectedNotif(${n.id})" style="margin-top:8px;padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">確認しました</button>
+      </div>`).join('');
+
+    // 承認待ち一覧
+    let myPendings = [];
+    if(isAdmin){
+      myPendings = pending;
+    } else if(myTeam){
+      myPendings = pending.filter(p=>p.teamX===myTeam||p.teamY===myTeam);
+    }
+
+    const pendingsHtml = myPendings.map(p=>{
+      const isMySubmission = !isAdmin && p.teamX===myTeam; // 自分が申請した
+      const isOppSubmission = !isAdmin && p.teamY===myTeam; // 相手が申請した（自分はteamY）
+      const sx = p.submissionX;
+      const sy = p.submissionY;
+      const dObj = new Date(p.date);
+      const dStr = dObj.toLocaleDateString('ja-JP',{month:'long',day:'numeric'});
+
+      let statusHtml = '';
+      if(p.status==='conflict'){
+        statusHtml = `<div style="color:var(--lose);font-size:12px;font-weight:700;margin-top:6px;">⚠️ スコアが一致しません。管理者が確認中です</div>`;
+        if(isAdmin){
+          statusHtml += `<div style="font-size:11px;color:var(--text2);margin-top:4px;">${p.teamX}申請: ${sx.scoreX}-${sx.scoreY}　${p.teamY}申請: ${sy.scoreX}-${sy.scoreY}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <button onclick="forceApprovePending(${p.id})" style="padding:7px 12px;background:var(--win);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:700;">✅ ${p.teamX}の申請で承認</button>
+            <button onclick="rejectPending(${p.id})" style="padding:7px 12px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 却下</button>
+          </div>`;
+        }
+      } else if(isMySubmission && !sy){
+        // 自分が申請済み、相手未申請
+        const subAt = sx.submittedAt ? new Date(sx.submittedAt) : null;
+        const expAt = subAt ? new Date(subAt.getTime()+72*60*60*1000) : null;
+        const expStr = expAt ? expAt.toLocaleDateString('ja-JP',{month:'long',day:'numeric',hour:'numeric',minute:'numeric'}) : '';
+        statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:6px;">申請スコア: ${sx.scoreX} - ${sx.scoreY}${expStr?'<br>自動承認: '+expStr:''}</div>
+          <button onclick="cancelPending(${p.id})" style="margin-top:8px;padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">取り消す</button>`;
+      } else if(isOppSubmission && !sy){
+        // 相手(teamX)が申請済み、自分(teamY)未申請 → 承認・却下ボタン表示
+        statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:6px;">${p.teamX}の申請スコア: ${sx.scoreX} - ${sx.scoreY}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <button onclick="rejectPending(${p.id})" style="padding:7px 12px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">管理者に委ねる</button>
+          </div>`;
+      } else if(isAdmin && !sy){
+        // 管理者視点: 片方のみ申請
+        const subAt = sx.submittedAt ? new Date(sx.submittedAt) : null;
+        const expAt = subAt ? new Date(subAt.getTime()+72*60*60*1000) : null;
+        const expStr = expAt ? expAt.toLocaleDateString('ja-JP',{month:'long',day:'numeric',hour:'numeric',minute:'numeric'}) : '';
+        statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:4px;">${p.teamX}申請: ${sx.scoreX}-${sx.scoreY}${expStr?'　自動承認: '+expStr:''}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <button onclick="forceApprovePending(${p.id})" style="padding:7px 12px;background:var(--win);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:700;">✅ 強制承認</button>
+            <button onclick="rejectPending(${p.id})" style="padding:7px 12px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 却下</button>
+          </div>`;
+      }
+
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:10px;color:var(--text2);">${dStr}　${p.season||''} G.C.P LEAGUE</div>
+        <div style="font-size:14px;font-weight:700;margin-top:2px;">${p.teamX} <span style="color:var(--text2);font-weight:400">vs</span> ${p.teamY}</div>
+        ${statusHtml}
+      </div>`;
+    }).join('');
+
+    if(notifsHtml || pendingsHtml){
+      pendingCardHtml = `<div class="card" style="margin-bottom:12px;">
+        <div class="card-label">⏳ 承認待ち</div>
+        ${notifsHtml}
+        ${pendingsHtml || '<div style="font-size:12px;color:var(--text2);padding:4px 0;">承認待ちの試合はありません</div>'}
+      </div>`;
+    }
+  }
+
   c.innerHTML = `
     <div style="padding:4px 0 12px;">
       <div style="font-size:16px;font-weight:900;color:var(--accent);">${team ? '👋 おかえり、'+team+'！' : '🏆 GCP T.E.D. LEAGUE'}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:2px;">${dateStr}</div>
     </div>
 
-
+    ${pendingCardHtml}
 
     <div class="card" style="margin-bottom:12px;">
       <div class="card-label">🏆 現在の順位</div>
@@ -1510,6 +1603,9 @@ function fbSync(){
       {name:'デイリー',       players:[{name:'',rating:''},{name:'',rating:''},{name:'',rating:''},{name:'',rating:''}]},
     ];
   }
+  if(!D.pendingMatches) D.pendingMatches = [];
+  if(!D.rejectedNotifs) D.rejectedNotifs = [];
+  checkAutoApproval();
   renderRobin(); renderHistory(); renderSchedule();
   renderTeams();
   refreshTeamSelects(); refreshStatsTeamSel();
@@ -1895,25 +1991,108 @@ function submitScore(){
   const oppWins = gameResults.filter(r=>r.winner==='opp').length;
   const entered = gameResults.filter(r=>r.winner!==null).length;
   const games   = collectGameData();
+
+  // 重複チェック: D.matches に既存の試合があるか
   const ei = D.matches.findIndex(m=>
     m.date===date &&
     ((m.teamA===myTeam&&m.teamB===oppTeam)||(m.teamA===oppTeam&&m.teamB===myTeam))
   );
-  // 既に登録済みの場合は送信不可（管理者上書きはFirebase対応時に追加）
   if(ei >= 0){
     toast(`⚠️ ${date} の ${myTeam} vs ${oppTeam} は既に登録済みです`);
     return;
   }
-  const rec = {id:Date.now(), date, season, teamA:myTeam, teamB:oppTeam, scoreA:myWins, scoreB:oppWins, games};
-  showConfirm('🎯 試合結果を申請',
-    `${myTeam}  ${myWins} - ${oppWins}  ${oppTeam}\n\n相手チームの確認後にロビン表へ反映されます`,
+
+  // 管理者の場合：即時 D.matches に追加（既存の動作）
+  if(currentUser.isAdmin){
+    const rec = {id:Date.now(), date, season, teamA:myTeam, teamB:oppTeam, scoreA:myWins, scoreB:oppWins, games};
+    showConfirm('🎯 試合結果を送信',
+      `${myTeam}  ${myWins} - ${oppWins}  ${oppTeam}\n\nロビン表へ即時反映されます`,
+      ()=>{
+        D.matches.push(rec);
+        save();
+        const gData = collectGameData();
+        resetScoreForm();
+        showResultSummary(myTeam, oppTeam, myWins, oppWins, gData);
+      }, '送信する');
+    return;
+  }
+
+  // 一般チームの場合：pendingMatches に保存して承認待ち
+  if(!D.pendingMatches) D.pendingMatches = [];
+
+  // pendingMatches に同じ日付・チームの組み合わせがあるか確認
+  const existingPending = D.pendingMatches.find(p=>
+    p.date===date &&
+    ((p.teamX===myTeam&&p.teamY===oppTeam)||(p.teamX===oppTeam&&p.teamY===myTeam))
+  );
+
+  if(existingPending){
+    // teamXが先に申請済み → teamYとして申請する場合
+    if(existingPending.teamX===oppTeam && existingPending.teamY===myTeam && !existingPending.submissionY){
+      // myTeamはteamY。myWins=teamYの勝ち数(=scoreY)、oppWins=teamXの勝ち数(=scoreX)
+      const submissionY = {
+        scoreX: oppWins,   // teamXの勝ち数
+        scoreY: myWins,    // teamYの勝ち数
+        games: games,
+        submittedAt: Date.now()
+      };
+      showConfirm('📤 試合結果を申請',
+        `${myTeam}  ${myWins} - ${oppWins}  ${oppTeam}\n\n相手チームの申請と照合されます`,
+        ()=>{
+          existingPending.submissionY = submissionY;
+          // スコア比較
+          if(existingPending.submissionX.scoreX === submissionY.scoreX &&
+             existingPending.submissionX.scoreY === submissionY.scoreY){
+            // 一致 → 自動承認
+            autoApprovePending(existingPending);
+          } else {
+            // 不一致 → conflict
+            existingPending.status = 'conflict';
+          }
+          save();
+          const gData = collectGameData();
+          resetScoreForm();
+          if(existingPending.status === 'conflict'){
+            toast('⚠️ スコアが一致しません。管理者が確認します');
+          } else {
+            showResultSummary(myTeam, oppTeam, myWins, oppWins, gData);
+          }
+          renderHome(); renderHistory();
+        }, '申請する');
+    } else if(existingPending.teamX===myTeam && existingPending.teamY===oppTeam){
+      toast(`⚠️ ${date} の ${myTeam} vs ${oppTeam} は既に申請中です`);
+    } else {
+      toast(`⚠️ ${date} の ${myTeam} vs ${oppTeam} は既に申請中です`);
+    }
+    return;
+  }
+
+  // 新規申請 (teamX として)
+  const submissionX = {
+    scoreX: myWins,
+    scoreY: oppWins,
+    games: games,
+    submittedAt: Date.now()
+  };
+  const pendingRec = {
+    id: Date.now(),
+    date, season,
+    teamX: myTeam,
+    teamY: oppTeam,
+    submissionX,
+    submissionY: null,
+    status: 'pending'
+  };
+  showConfirm('📤 試合結果を申請',
+    `${myTeam}  ${myWins} - ${oppWins}  ${oppTeam}\n\n相手チームの確認後にロビン表へ反映されます\n（3日以内に相手が未申請の場合は自動承認）`,
     ()=>{
-      D.matches.push(rec);
+      D.pendingMatches.push(pendingRec);
       save();
       const gData = collectGameData();
       resetScoreForm();
-      showResultSummary(myTeam, oppTeam, myWins, oppWins, gData);
-    }, '送信する');
+      toast('⏳ 申請しました。相手チームの確認をお待ちください');
+      renderHome(); renderHistory();
+    }, '申請する');
 }
 
 function resetScoreForm(){
@@ -1931,6 +2110,144 @@ function resetScoreForm(){
   document.getElementById('s-my-score').textContent = '0';
   document.getElementById('s-opp-score').textContent = '0';
   updateProgress();
+}
+
+// ─────────────────────────────────────────
+//  PENDING MATCHES (承認ワークフロー)
+// ─────────────────────────────────────────
+
+// 自動承認: pendingをmatchesに移動
+function autoApprovePending(pending){
+  if(!D.pendingMatches) D.pendingMatches = [];
+  const sx = pending.submissionX;
+  const sy = pending.submissionY;
+
+  // gamesのマージ
+  let mergedGames = sx.games || [];
+  if(sy && sy.games && sy.games.length){
+    // submissionYのgames[i]でplayersを補足（winnerはsubmissionXを基準）
+    mergedGames = sx.games.map((gx, i)=>{
+      const gy = (sy.games||[])[i] || {};
+      // submissionYのwinner='my'はteamYが勝ち → teamX視点では'opp'
+      // マージ時はsubmissionXのwinnerを使う（既にteamX視点）
+      const combinedPlayers = [...(gx.players||[]), ...(gy.players||[])];
+      return { ...gx, players: combinedPlayers };
+    });
+  }
+
+  const matchRec = {
+    id: Date.now(),
+    date: pending.date,
+    season: pending.season,
+    teamA: pending.teamX,
+    teamB: pending.teamY,
+    scoreA: sx.scoreX,
+    scoreB: sx.scoreY,
+    games: mergedGames
+  };
+  D.matches.push(matchRec);
+  D.pendingMatches = D.pendingMatches.filter(p=>p.id!==pending.id);
+  pending.status = 'approved'; // マーク（配列から削除済みだが念のため）
+}
+
+// 3日後自動承認チェック（起動時・Firebase sync時に呼ぶ）
+function checkAutoApproval(){
+  if(!D.pendingMatches) D.pendingMatches = [];
+  const now = Date.now();
+  const limit72h = 72 * 60 * 60 * 1000; // 72時間
+  let changed = false;
+  D.pendingMatches.forEach(p=>{
+    if(p.status !== 'pending') return;
+    if(p.submissionY) return; // 両方申請済みならここでは処理しない（conflict等）
+    const age = now - (p.submissionX?.submittedAt || 0);
+    if(age >= limit72h){
+      autoApprovePending(p);
+      changed = true;
+    }
+  });
+  if(changed) save();
+}
+
+// 申請取り消し（自チームが申請したpendingを取り消す）
+function cancelPending(id){
+  if(!D.pendingMatches) D.pendingMatches = [];
+  const p = D.pendingMatches.find(x=>x.id===id);
+  if(!p){ toast('申請が見つかりません'); return; }
+  const team = currentUser && currentUser.team;
+  if(!team){ toast('ログインが必要です'); return; }
+  // teamXが取り消す（submissionXのみの場合）
+  if(p.teamX===team && !p.submissionY){
+    showConfirm('🗑️ 申請を取り消す', `${p.date} ${p.teamX} vs ${p.teamY} の申請を取り消しますか？`, ()=>{
+      D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
+      save(); renderHome(); renderHistory();
+      toast('申請を取り消しました');
+    }, '取り消す');
+  } else if(p.teamY===team && p.submissionY){
+    // teamYが自分の申請を取り消す → submissionYをnullに戻す
+    showConfirm('🗑️ 申請を取り消す', `${p.date} ${p.teamX} vs ${p.teamY} の申請を取り消しますか？`, ()=>{
+      p.submissionY = null;
+      p.status = 'pending';
+      save(); renderHome(); renderHistory();
+      toast('申請を取り消しました');
+    }, '取り消す');
+  } else {
+    toast('取り消せません');
+  }
+}
+
+// 管理者による強制承認
+function forceApprovePending(id){
+  if(!currentUser || !currentUser.isAdmin){ toast('管理者のみ操作できます'); return; }
+  if(!D.pendingMatches) D.pendingMatches = [];
+  const p = D.pendingMatches.find(x=>x.id===id);
+  if(!p){ toast('申請が見つかりません'); return; }
+  showConfirm('✅ 強制承認', `${p.date} ${p.teamX} vs ${p.teamY} を強制承認しますか？`, ()=>{
+    // submissionYがなければsubmissionXのスコアで承認
+    if(!p.submissionY){
+      p.submissionY = {
+        scoreX: p.submissionX.scoreX,
+        scoreY: p.submissionX.scoreY,
+        games: [],
+        submittedAt: Date.now()
+      };
+    }
+    autoApprovePending(p);
+    save(); renderHome(); renderHistory(); renderRobin();
+    toast('✅ 承認しました');
+  }, '承認する');
+}
+
+// 却下（相手チームまたは管理者が実行）→ rejectedNotifs に記録
+function rejectPending(id){
+  if(!D.pendingMatches) D.pendingMatches = [];
+  const p = D.pendingMatches.find(x=>x.id===id);
+  if(!p){ toast('申請が見つかりません'); return; }
+  if(!currentUser){ toast('ログインが必要です'); return; }
+  const isAdmin = currentUser.isAdmin;
+  const isOpp = currentUser.team === p.teamY;
+  if(!isAdmin && !isOpp){ toast('操作できません'); return; }
+  showConfirm('❌ 申請を却下', `${p.date} ${p.teamX} vs ${p.teamY} の申請を却下しますか？\n申請チームに通知されます`, ()=>{
+    if(!D.rejectedNotifs) D.rejectedNotifs = [];
+    D.rejectedNotifs.push({
+      id: Date.now(),
+      pendingId: p.id,
+      teamX: p.teamX,
+      teamY: p.teamY,
+      date: p.date,
+      rejectedAt: Date.now(),
+      rejectedBy: isAdmin ? '__admin__' : currentUser.team
+    });
+    D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
+    save(); renderHome(); renderHistory();
+    toast('❌ 却下しました');
+  }, '却下する');
+}
+
+// 却下通知を確認して削除
+function dismissRejectedNotif(id){
+  if(!D.rejectedNotifs) D.rejectedNotifs = [];
+  D.rejectedNotifs = D.rejectedNotifs.filter(n=>n.id!==id);
+  save(); renderHome();
 }
 
 // ─────────────────────────────────────────
@@ -1986,12 +2303,70 @@ function renderRobin(){
 // ─────────────────────────────────────────
 function renderHistory(){
   const c = document.getElementById('history-content');
-  if(!D.matches.length){
+
+  // ── 承認待ちセクション（先頭に追加）──
+  const pending = D.pendingMatches || [];
+  let pendingSectionHtml = '';
+  if(pending.length){
+    const isAdmin = currentUser && currentUser.isAdmin;
+    const myTeam = currentUser && !currentUser.isGuest ? currentUser.team : null;
+    const rows = pending.map(p=>{
+      const sx = p.submissionX;
+      const sy = p.submissionY;
+      const dObj = new Date(p.date);
+      const dStr = dObj.toLocaleDateString('ja-JP',{month:'long',day:'numeric'});
+      let statusText = '';
+      let actionHtml = '';
+      if(p.status==='conflict'){
+        statusText = '⚠️ スコア不一致・管理者確認中';
+        if(isAdmin){
+          actionHtml = `<div style="display:flex;gap:6px;margin-top:6px;">
+            <button onclick="forceApprovePending(${p.id})" style="padding:5px 10px;background:var(--win);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">✅ 承認</button>
+            <button onclick="rejectPending(${p.id})" style="padding:5px 10px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 却下</button>
+          </div>`;
+        }
+      } else {
+        statusText = '⏳ 承認待ち';
+        if(sx && !sy) statusText += `（${p.teamX}が申請済み）`;
+        if(isAdmin){
+          actionHtml = `<div style="display:flex;gap:6px;margin-top:6px;">
+            <button onclick="forceApprovePending(${p.id})" style="padding:5px 10px;background:var(--win);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">✅ 承認</button>
+            <button onclick="rejectPending(${p.id})" style="padding:5px 10px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 却下</button>
+          </div>`;
+        } else if(myTeam){
+          if(p.teamX===myTeam && !sy){
+            actionHtml = `<button onclick="cancelPending(${p.id})" style="margin-top:6px;padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">取り消す</button>`;
+          } else if(p.teamY===myTeam && !sy){
+            actionHtml = `<button onclick="rejectPending(${p.id})" style="margin-top:6px;padding:5px 10px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">管理者に委ねる</button>`;
+          }
+        }
+      }
+      const scoreDisp = sx ? `${sx.scoreX} - ${sx.scoreY}` : '-';
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:10px;color:var(--text2);">${dStr}　${p.season||''} G.C.P LEAGUE</div>
+            <div style="font-size:14px;font-weight:700;margin-top:2px;">${p.teamX} <span style="color:var(--text2);font-weight:400">vs</span> ${p.teamY}</div>
+          </div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--text2);">${scoreDisp}</div>
+        </div>
+        <div style="font-size:11px;color:var(--accent);margin-top:4px;">${statusText}</div>
+        ${actionHtml}
+      </div>`;
+    }).join('');
+
+    pendingSectionHtml = `<div style="margin-bottom:16px;">
+      <div class="card-label" style="margin-bottom:8px;">⏳ 承認待ちの試合</div>
+      ${rows}
+    </div>`;
+  }
+
+  if(!D.matches.length && !pending.length){
     c.innerHTML='<div class="empty-state"><div class="ico">📅</div><p>試合履歴がありません。</p></div>';
     return;
   }
   const sorted = [...D.matches].sort((a,b)=>b.id-a.id);
-  c.innerHTML = sorted.map(m=>{
+  const matchesHtml = sorted.length ? sorted.map(m=>{
     const won = m.scoreA > m.scoreB;
     const detailRows = (m.games||[]).filter(g=>g.winner).map(g=>{
       const isCr = (g.label||"").includes("クリケット");
@@ -2026,7 +2401,9 @@ function renderHistory(){
         ${(currentUser && currentUser.isAdmin) ? `<button class="hist-del" onclick="deleteMatch(event,${m.id})">この試合を削除</button>` : ''}
       </div>
     </div>`;
-  }).join('');
+  }).join('') : '<div class="empty-state"><div class="ico">📅</div><p>試合履歴がありません。</p></div>';
+
+  c.innerHTML = pendingSectionHtml + matchesHtml;
 }
 
 function toggleDetail(id){
@@ -3120,6 +3497,7 @@ async function init(){
       if(overlay) overlay.style.display = 'none';
       if(window._fbLatestData && Object.keys(window._fbLatestData).length > 0) {
         applyFirebaseData(window._fbLatestData);
+        checkAutoApproval();
         renderRobin(); renderHistory(); renderSchedule();
         renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
       }
