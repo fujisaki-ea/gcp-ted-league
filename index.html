@@ -1522,7 +1522,8 @@ function renderHome(){
         // 相手(teamX)が申請済み、自分(teamY)未申請 → 承認・却下ボタン表示
         statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:6px;">${p.teamX}の申請スコア: ${sx.scoreX} - ${sx.scoreY}</div>
           <div style="display:flex;gap:6px;margin-top:8px;">
-            <button onclick="rejectPending(${p.id})" style="padding:7px 12px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">管理者に委ねる</button>
+            <button onclick="forceApprovePending(${p.id})" style="padding:7px 12px;background:var(--win);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:700;">✅ 承認</button>
+            <button onclick="rejectPending(${p.id})" style="padding:7px 12px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 拒否</button>
           </div>`;
       } else if(isAdmin && !sy){
         // 管理者視点: 片方のみ申請
@@ -2337,7 +2338,10 @@ function renderHistory(){
           if(p.teamX===myTeam && !sy){
             actionHtml = `<button onclick="cancelPending(${p.id})" style="margin-top:6px;padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">取り消す</button>`;
           } else if(p.teamY===myTeam && !sy){
-            actionHtml = `<button onclick="rejectPending(${p.id})" style="margin-top:6px;padding:5px 10px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">管理者に委ねる</button>`;
+            actionHtml = `<div style="display:flex;gap:6px;margin-top:6px;">
+              <button onclick="forceApprovePending(${p.id})" style="padding:5px 10px;background:var(--win);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">✅ 承認</button>
+              <button onclick="rejectPending(${p.id})" style="padding:5px 10px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 拒否</button>
+            </div>`;
           }
         }
       }
