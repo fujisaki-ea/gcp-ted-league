@@ -1924,8 +1924,25 @@ function populatePlayerDropdowns(){
   const myName = document.getElementById('s-my-team').value;
   const team   = D.teams.find(t=>t.name===myName);
   const members = team ? team.players : [];
+
+  // シングルスゲームのインデックス一覧
+  const singlesIndices = GAMES.map((gd,i)=>gd.n===1?i:-1).filter(i=>i>=0);
+
+  // 各シングルスゲームで選ばれている選手名を収集
+  function getSinglesSelected(excludeIdx){
+    const selected = new Set();
+    singlesIndices.forEach(si=>{
+      if(si===excludeIdx) return;
+      const pg = document.getElementById('pg-'+si); if(!pg) return;
+      const v = pg.querySelector('.pe-name')?.value;
+      if(v) selected.add(v);
+    });
+    return selected;
+  }
+
   GAMES.forEach((gd,idx)=>{
     const pg = document.getElementById('pg-'+idx); if(!pg) return;
+    const isSingles = gd.n === 1;
     const allSels = [...pg.querySelectorAll('.pe-name')];
     allSels.forEach((sel, si)=>{
       const cur = sel.value;
@@ -1934,11 +1951,22 @@ function populatePlayerDropdowns(){
         .filter((_,i)=>i!==si)
         .map(s=>s.value)
         .filter(Boolean);
+      // シングルス出場済みの選手（他のシングルスゲームで選ばれている）
+      const singlesUsed = isSingles ? getSinglesSelected(idx) : new Set();
+
       sel.innerHTML = '<option value="">— 選手 —</option>';
       members.forEach(m=>{
-        if(m.name && !otherSelected.includes(m.name)){
-          const o=document.createElement('option');o.value=m.name;o.textContent=m.name;sel.appendChild(o);
+        if(!m.name || otherSelected.includes(m.name)) return;
+        const o = document.createElement('option');
+        o.value = m.name;
+        if(isSingles && singlesUsed.has(m.name)){
+          o.textContent = m.name + '（シングルス出場済み）';
+          o.disabled = true;
+          o.style.color = 'var(--text2)';
+        } else {
+          o.textContent = m.name;
         }
+        sel.appendChild(o);
       });
       // gameResultsから保存済み選手名を復元
       const saved = (gameResults[idx]?.players||[])[si]?.name || '';
