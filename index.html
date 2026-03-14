@@ -2198,11 +2198,18 @@ function cancelPending(id){
 
 // 管理者による強制承認
 function forceApprovePending(id){
-  if(!currentUser || !currentUser.isAdmin){ toast('管理者のみ操作できます'); return; }
+  if(!currentUser){ toast('ログインが必要です'); return; }
   if(!D.pendingMatches) D.pendingMatches = [];
   const p = D.pendingMatches.find(x=>x.id===id);
   if(!p){ toast('申請が見つかりません'); return; }
-  showConfirm('✅ 強制承認', `${p.date} ${p.teamX} vs ${p.teamY} を強制承認しますか？`, ()=>{
+  // 管理者・相手チーム（teamY）のみ承認可能
+  const isAdmin = currentUser.isAdmin;
+  const isOpp = currentUser.team === p.teamY;
+  if(!isAdmin && !isOpp){ toast('承認できません'); return; }
+  const confirmMsg = isAdmin
+    ? `${p.date} ${p.teamX} vs ${p.teamY} を強制承認しますか？`
+    : `${p.date} ${p.teamX} vs ${p.teamY} の結果を承認しますか？`;
+  showConfirm('✅ 承認', confirmMsg, ()=>{
     // submissionYがなければsubmissionXのスコアで承認
     if(!p.submissionY){
       p.submissionY = {
