@@ -20,9 +20,18 @@ jobs:
         run: |
           mkdir -p backups
           DATE=$(TZ='Asia/Tokyo' date '+%Y-%m-%d')
-          curl -s "https://gcp-league-677e9-default-rtdb.asia-southeast1.firebasedatabase.app/gcpLeague.json" \
-            -o "backups/${DATE}.json"
+          # スコア・チームデータ
+          LEAGUE=$(curl -s "https://gcp-league-677e9-default-rtdb.asia-southeast1.firebasedatabase.app/gcpLeague.json")
+          # パスワード（ハッシュ）
+          PASSWORDS=$(curl -s "https://gcp-league-677e9-default-rtdb.asia-southeast1.firebasedatabase.app/passwords.json")
+          echo "{\"gcpLeague\":${LEAGUE},\"passwords\":${PASSWORDS}}" > "backups/${DATE}.json"
           echo "Backed up: backups/${DATE}.json"
+
+      - name: Delete old backups (keep last 30 days)
+        run: |
+          cd backups
+          ls -1 *.json 2>/dev/null | sort | head -n -30 | xargs -r rm --
+          echo "Old backups cleaned up"
 
       - name: Commit backup
         run: |
