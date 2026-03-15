@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD-Li0Wdq11eWhkBzfFgOX2ZG9qzodv_94",
@@ -17,6 +18,8 @@ initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider('6LfGL4osAAAAAK1MvNL5iwIgPmDrtTscgGLwJGOa'),
   isTokenAutoRefreshEnabled: true
 });
+const auth = getAuth(app);
+signInAnonymously(auth).catch(e => console.error('Anonymous auth error:', e));
 const db = getDatabase(app);
 const dataRef = ref(db, 'gcpLeague');
 const pwRef = ref(db, 'passwords');
