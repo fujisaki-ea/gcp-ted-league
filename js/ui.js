@@ -146,7 +146,8 @@ function load(){
     if(s) D=JSON.parse(s);
   }catch(e){}
   if(!D.schedule) D.schedule = [];
-  D.schedule = [...D.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026];
+  const extra2026 = D.schedule.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
+  D.schedule = [...D.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026, ...extra2026];
   if(!D.pendingMatches) D.pendingMatches = [];
   if(!D.rejectedNotifs) D.rejectedNotifs = [];
 }
@@ -156,7 +157,8 @@ function applyFirebaseData(data) {
   if(data.teams)   D.teams   = data.teams;
   if(data.matches) D.matches = data.matches;
   if(data.schedule) {
-    D.schedule = [...data.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026];
+    const extra2026 = data.schedule.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
+    D.schedule = [...data.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026, ...extra2026];
   }
   D.pendingMatches = data.pendingMatches || [];
   D.rejectedNotifs = data.rejectedNotifs || [];
