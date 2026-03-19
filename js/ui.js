@@ -194,6 +194,7 @@ function showView(name, btn){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
+  if(currentUser && !currentUser.isGuest) sessionStorage.setItem('gcpView', name);
   if(name==='home')     renderHome();
   if(name==='robin')    renderRobin();
   if(name==='history')  renderHistory();
@@ -961,6 +962,31 @@ async function init(){
         checkAutoApproval();
         renderRobin(); renderHistory(); renderSchedule();
         renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
+      }
+    }
+    // セッション復元（リロード後の自動ログイン）
+    const savedSession = sessionStorage.getItem('gcpSession');
+    if(savedSession) {
+      try {
+        const {team, isAdmin} = JSON.parse(savedSession);
+        currentUser = {team: isAdmin ? null : team, isAdmin, isGuest: false};
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('hdr-login-btn').style.display = 'none';
+        const badge = document.getElementById('hdr-login-badge');
+        badge.textContent = isAdmin ? '管理者 ✕' : team + ' ✕';
+        badge.style.display = 'inline-block';
+        const teamsBtn = document.getElementById('hdr-teams-btn');
+        if(teamsBtn) teamsBtn.style.display = 'inline-block';
+        if(!isAdmin){ lockMyTeam(team); document.getElementById('s-my-name').textContent = team; }
+        else { document.getElementById('s-my-name').textContent = '管理者'; }
+        document.querySelectorAll('.nav-btn').forEach(b=>b.style.display='');
+        renderTeams();
+        const savedView = sessionStorage.getItem('gcpView') || 'home';
+        const navBtn = document.querySelector(`.nav-btn[onclick*="'${savedView}'"]`);
+        showView(savedView, navBtn);
+      } catch(e) {
+        sessionStorage.removeItem('gcpSession');
+        sessionStorage.removeItem('gcpView');
       }
     }
     fbSync();

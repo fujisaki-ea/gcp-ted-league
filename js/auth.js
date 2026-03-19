@@ -35,6 +35,7 @@ async function doLogin(){
   err.textContent = '';
   const isAdmin = team === '__admin__';
   currentUser = {team: isAdmin ? null : team, isAdmin, isGuest: false};
+  sessionStorage.setItem('gcpSession', JSON.stringify({team, isAdmin}));
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('hdr-login-btn').style.display = 'none';
   const badge = document.getElementById('hdr-login-badge');
@@ -83,6 +84,7 @@ async function quickLoginSubmit(){
   errEl.textContent = '';
   document.getElementById('modal-quick-login').classList.remove('open');
   currentUser = {team, isAdmin:false, isGuest:false};
+  sessionStorage.setItem('gcpSession', JSON.stringify({team, isAdmin:false}));
   const badge = document.getElementById('hdr-login-badge');
   badge.textContent = team + ' ✕';
   badge.style.display = 'inline-block';
@@ -113,6 +115,8 @@ function skipLogin(){
 
 function doLogout(){
   showConfirm('ログアウト', 'ログアウトしますか？', ()=>{
+    sessionStorage.removeItem('gcpSession');
+    sessionStorage.removeItem('gcpView');
     resetScoreForm();
     const sc = document.getElementById('stats-content');
     if(sc) sc.innerHTML = '<div class="empty-state"><div class="ico">📊</div><p>チームを選択してください</p></div>';
