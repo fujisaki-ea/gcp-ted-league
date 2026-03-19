@@ -161,7 +161,7 @@ function toArray(val, withKey=false) {
 
 function applyFirebaseData(data) {
   if(!data) return;
-  if(data.teams)   D.teams   = toArray(data.teams);
+  if(data.teams)   D.teams   = toArray(data.teams).map(t => ({...t, players: toArray(t.players)}));
   if(data.matches) D.matches = toArray(data.matches, true);
   if(data.schedule) {
     const sched = toArray(data.schedule);
@@ -620,7 +620,7 @@ function renderTeams(){
   c.innerHTML = addBtn + teamsToShow.map((t, idx)=>{
     const i = teamIndices[idx];
     const isDeleteMode = deleteModeTeamIdx === i;
-    const members = t.players.map((p,pi)=>{
+    const members = (t.players || []).map((p,pi)=>{
       const isEditing = inlineEditing && inlineEditing.teamIdx===i && inlineEditing.playerIdx===pi;
       if(isEditing){
         return `<div class="member-row editing" id="inline-row-${i}-${pi}" style="display:block;">
