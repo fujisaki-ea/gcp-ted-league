@@ -970,6 +970,8 @@ async function init(){
       try {
         const {team, isAdmin} = JSON.parse(savedSession);
         currentUser = {team: isAdmin ? null : team, isAdmin, isGuest: false};
+        const overlay = document.getElementById('fb-connecting-overlay');
+        if(overlay) overlay.style.display = 'none';
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('hdr-login-btn').style.display = 'none';
         const badge = document.getElementById('hdr-login-badge');
