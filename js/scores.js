@@ -106,6 +106,10 @@ function restoreScoreForm(){
   if(!saved) return;
   try{
     const s = JSON.parse(saved);
+    // 管理者以外は自チームのデータのみ復元可能
+    if(currentUser && !currentUser.isAdmin && s.myTeam && s.myTeam !== currentUser.team){
+      return;
+    }
     const myTeamSel  = document.getElementById('s-my-team');
     const oppTeamSel = document.getElementById('s-opp-team');
     if(myTeamSel && s.myTeam && [...myTeamSel.options].some(o=>o.value===s.myTeam)){

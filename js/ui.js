@@ -928,7 +928,13 @@ function closeNumpad() {
 //  UTILS
 // ─────────────────────────────────────────
 function showScoreResumeBanner(){
-  if(!localStorage.getItem('gcpScoreForm')) return;
+  const raw = localStorage.getItem('gcpScoreForm');
+  if(!raw) return;
+  try{
+    const s = JSON.parse(raw);
+    // 管理者以外は自チームのデータのみ復元可能
+    if(currentUser && !currentUser.isAdmin && s.myTeam && s.myTeam !== currentUser.team) return;
+  }catch(e){ localStorage.removeItem('gcpScoreForm'); return; }
   const existing = document.getElementById('score-resume-banner');
   if(existing) existing.remove();
   const banner = document.createElement('div');
