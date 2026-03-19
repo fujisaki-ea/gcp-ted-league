@@ -600,7 +600,10 @@ function renderTeams(){
     ? D.teams.map((_,i)=>i)
     : D.teams.map((t,i)=>i).filter(i => currentUser && D.teams[i].name === currentUser.team);
 
-  c.innerHTML = teamsToShow.map((t, idx)=>{
+  const addBtn = (currentUser && currentUser.isAdmin)
+    ? `<div style="margin-bottom:12px;"><button onclick="openAddTeamModal()" style="width:100%;padding:12px;background:var(--accent);color:#fff;font-weight:700;font-size:14px;border:none;border-radius:10px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">＋ チームを追加</button></div>`
+    : '';
+  c.innerHTML = addBtn + teamsToShow.map((t, idx)=>{
     const i = teamIndices[idx];
     const isDeleteMode = deleteModeTeamIdx === i;
     const members = t.players.map((p,pi)=>{
