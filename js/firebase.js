@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, update, push, remove, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -24,9 +24,15 @@ const db = getDatabase(app);
 const dataRef = ref(db, 'gcpLeague');
 const pwRef = ref(db, 'passwords');
 
-// Firebase保存
+const pendingRef  = ref(db, 'gcpLeague/pendingMatches');
+const matchesRef  = ref(db, 'gcpLeague/matches');
+const notifsRef   = ref(db, 'gcpLeague/rejectedNotifs');
+
+// チームのみ部分更新（pendingMatches/matches/rejectedNotifs/schedule は上書きしない）
 window.fbSave = function(data) {
-  set(dataRef, data)
+  const payload = {};
+  if(data.teams !== undefined) payload.teams = data.teams;
+  update(dataRef, payload)
     .then(() => {
       const badge = document.getElementById('sync-badge');
       if(badge){ badge.textContent='✅ 保存済み'; badge.className='sync-badge ok'; badge.style.opacity='1'; setTimeout(()=>{ badge.style.opacity='0'; }, 2000); }
@@ -35,6 +41,42 @@ window.fbSave = function(data) {
       const badge = document.getElementById('sync-badge');
       if(badge){ badge.textContent='❌ 保存失敗'; badge.className='sync-badge err'; badge.style.opacity='1'; }
     });
+};
+
+// pendingMatches: atomic push（競合なし）
+window.fbPushPending = async function(record) {
+  const clean = Object.fromEntries(Object.entries(record).filter(([k])=>k!=='_fbKey'));
+  const r = await push(pendingRef, clean);
+  return r.key;
+};
+window.fbUpdatePending = function(fbKey, data) {
+  return update(ref(db, 'gcpLeague/pendingMatches/' + fbKey), data);
+};
+window.fbRemovePending = function(fbKey) {
+  return remove(ref(db, 'gcpLeague/pendingMatches/' + fbKey));
+};
+
+// matches: atomic push
+window.fbPushMatch = async function(record) {
+  const clean = Object.fromEntries(Object.entries(record).filter(([k])=>k!=='_fbKey'));
+  const r = await push(matchesRef, clean);
+  return r.key;
+};
+window.fbRemoveMatch = function(fbKey) {
+  return remove(ref(db, 'gcpLeague/matches/' + fbKey));
+};
+window.fbClearMatches = function() {
+  return set(matchesRef, null);
+};
+
+// rejectedNotifs
+window.fbPushNotif = async function(record) {
+  const clean = Object.fromEntries(Object.entries(record).filter(([k])=>k!=='_fbKey'));
+  const r = await push(notifsRef, clean);
+  return r.key;
+};
+window.fbRemoveNotif = function(fbKey) {
+  return remove(ref(db, 'gcpLeague/rejectedNotifs/' + fbKey));
 };
 
 // onValueで初回データ取得 → オーバーレイを消す → 以降もリアルタイム同期

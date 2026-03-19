@@ -100,7 +100,8 @@ function updateSyncBadge(state){
 function save(){
   try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
   if(window.fbSave) {
-    window.fbSave(JSON.parse(JSON.stringify(D)));
+    // pendingMatches/matches/rejectedNotifs は個別操作で管理するため teams のみ送信
+    window.fbSave({ teams: D.teams });
   } else {
     updateSyncBadge('ok');
   }
@@ -152,16 +153,23 @@ function load(){
   if(!D.rejectedNotifs) D.rejectedNotifs = [];
 }
 
+function toArray(val, withKey=false) {
+  if(!val) return [];
+  if(Array.isArray(val)) return val;
+  return Object.entries(val).map(([k,v]) => withKey ? {...v, _fbKey:k} : v);
+}
+
 function applyFirebaseData(data) {
   if(!data) return;
-  if(data.teams)   D.teams   = data.teams;
-  if(data.matches) D.matches = data.matches;
+  if(data.teams)   D.teams   = toArray(data.teams);
+  if(data.matches) D.matches = toArray(data.matches, true);
   if(data.schedule) {
-    const extra2026 = data.schedule.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
-    D.schedule = [...data.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026, ...extra2026];
+    const sched = toArray(data.schedule);
+    const extra2026 = sched.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
+    D.schedule = [...sched.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026, ...extra2026];
   }
-  D.pendingMatches = data.pendingMatches || [];
-  D.rejectedNotifs = data.rejectedNotifs || [];
+  D.pendingMatches = toArray(data.pendingMatches, true);
+  D.rejectedNotifs = toArray(data.rejectedNotifs, true);
   try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
 }
 
@@ -567,7 +575,8 @@ function resetMatchHistory(){
   if(!currentUser || !currentUser.isAdmin){ toast('⚠️ 管理者のみ操作できます'); return; }
   if(!confirm('⚠️ 試合履歴をすべて削除します。\nこの操作は取り消せません。続けますか？')) return;
   D.matches = [];
-  save();
+  if(window.fbClearMatches) window.fbClearMatches();
+  try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
   renderHistory();
   renderRobin();
   toast('✅ 試合履歴をリセットしました');
@@ -577,8 +586,12 @@ function deleteMatch(e,id){
   if(!currentUser || !currentUser.isAdmin){
     toast('⚠️ 試合削除は管理者のみできます'); return;
   }
-  showConfirm('🗑️ 削除確認', 'この試合を削除しますか？\n\n削除すると元に戻せません。', ()=>{
-    D.matches=D.matches.filter(m=>m.id!==id); save(); renderHistory();
+  showConfirm('🗑️ 削除確認', 'この試合を削除しますか？\n\n削除すると元に戻せません。', async ()=>{
+    const m = D.matches.find(x=>x.id===id);
+    if(m && window.fbRemoveMatch && m._fbKey) await window.fbRemoveMatch(m._fbKey);
+    D.matches = D.matches.filter(m=>m.id!==id);
+    try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+    renderHistory();
   }, '削除する');
 }
 
@@ -590,7 +603,7 @@ let deleteModeTeamIdx = null;
 
 function renderTeams(){
   const c = document.getElementById('teams-content');
-  if(!D.teams.length){
+  if(!D.teams || !D.teams.length){
     c.innerHTML='<div class="empty-state"><div class="ico">⚙️</div><p>チームがありません。</p></div>';
     return;
   }
