@@ -43,7 +43,6 @@ async function doLogin(){
   badge.style.display = 'inline-block';
   const teamsBtn = document.getElementById('hdr-teams-btn');
   if(teamsBtn) teamsBtn.style.display = 'inline-block';
-  resetScoreForm();
   const sc2 = document.getElementById('stats-content');
   if(sc2) sc2.innerHTML = '<div class="empty-state"><div class="ico">📊</div><p>チームを選択してください</p></div>';
   const statsSel2 = document.getElementById('stats-team-sel');
@@ -58,6 +57,7 @@ async function doLogin(){
   renderTeams();
   const homeBtn = document.getElementById('nav-home');
   showView('home', homeBtn);
+  showScoreResumeBanner();
 }
 
 function quickLogin(team){

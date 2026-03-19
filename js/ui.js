@@ -927,6 +927,22 @@ function closeNumpad() {
 // ─────────────────────────────────────────
 //  UTILS
 // ─────────────────────────────────────────
+function showScoreResumeBanner(){
+  if(!localStorage.getItem('gcpScoreForm')) return;
+  const existing = document.getElementById('score-resume-banner');
+  if(existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'score-resume-banner';
+  banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:480px;background:#1e293b;color:#fff;border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+  banner.innerHTML = `
+    <span style="font-size:13px;">⚠️ 入力途中のスコアデータがあります</span>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <button onclick="document.getElementById('score-resume-banner').remove();resetScoreForm();" style="background:transparent;border:1px solid #64748b;color:#94a3b8;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">破棄</button>
+      <button onclick="document.getElementById('score-resume-banner').remove();showView('score',document.querySelector('.nav-btn[onclick*=\\'score\\']'));" style="background:var(--accent,#3b82f6);border:none;color:#fff;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:700;">続きを入力</button>
+    </div>`;
+  document.body.appendChild(banner);
+}
+
 function toast(msg){
   const el=document.getElementById('toast');
   el.textContent=msg; el.classList.add('show');
@@ -1009,6 +1025,7 @@ async function init(){
         const savedView = sessionStorage.getItem('gcpView') || 'home';
         const navBtn = document.querySelector(`.nav-btn[onclick*="'${savedView}'"]`);
         showView(savedView, navBtn);
+        showScoreResumeBanner();
       } catch(e) {
         sessionStorage.removeItem('gcpSession');
         sessionStorage.removeItem('gcpView');
