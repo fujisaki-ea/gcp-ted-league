@@ -88,6 +88,51 @@ function clearForfeit(idx){
 // ─────────────────────────────────────────
 let gameResults = GAMES.map(()=>({winner:null, players:[],forfeit:false}));
 let collapseOpen = {};
+let _scoreFormRestored = false;
+
+function saveScoreForm(){
+  if(!currentUser || currentUser.isGuest) return;
+  const state = {
+    myTeam:  document.getElementById('s-my-team')?.value  || '',
+    oppTeam: document.getElementById('s-opp-team')?.value || '',
+    season:  document.getElementById('s-season')?.value   || '',
+    gameResults, collapseOpen, playerCount, forfeitSinglesIdx
+  };
+  try{ sessionStorage.setItem('gcpScoreForm', JSON.stringify(state)); }catch(e){}
+}
+
+function restoreScoreForm(){
+  const saved = sessionStorage.getItem('gcpScoreForm');
+  if(!saved) return;
+  try{
+    const s = JSON.parse(saved);
+    const myTeamSel  = document.getElementById('s-my-team');
+    const oppTeamSel = document.getElementById('s-opp-team');
+    if(myTeamSel && s.myTeam && [...myTeamSel.options].some(o=>o.value===s.myTeam)){
+      myTeamSel.value = s.myTeam;
+      document.getElementById('s-my-name').textContent = s.myTeam;
+    }
+    if(oppTeamSel && s.oppTeam && [...oppTeamSel.options].some(o=>o.value===s.oppTeam)){
+      oppTeamSel.value = s.oppTeam;
+      document.getElementById('s-opp-name').textContent = s.oppTeam;
+    }
+    const seasonSel = document.getElementById('s-season');
+    if(seasonSel && s.season) seasonSel.value = s.season;
+    gameResults       = s.gameResults || GAMES.map(()=>({winner:null,players:[],forfeit:false}));
+    collapseOpen      = s.collapseOpen || {};
+    playerCount       = s.playerCount  || 4;
+    forfeitSinglesIdx = s.forfeitSinglesIdx ?? null;
+    document.querySelectorAll('.player-count-btn').forEach(b=>{
+      b.classList.toggle('active', parseInt(b.dataset.count)===playerCount);
+    });
+    buildGames(true);
+    populatePlayerDropdowns();
+    updateLiveScore();
+    updateProgress();
+  }catch(e){
+    sessionStorage.removeItem('gcpScoreForm');
+  }
+}
 
 function buildGames(skipSave=false){
   if(!skipSave){
@@ -98,6 +143,7 @@ function buildGames(skipSave=false){
       const ratings = [...pg.querySelectorAll('.pe-rating')].map(s=>s.value);
       r.players = names.map((n,i)=>({name:n,rating:ratings[i]||''}));
     });
+    saveScoreForm();
   }
   const wrap = document.getElementById('games-wrap');
   wrap.innerHTML = '';
@@ -263,14 +309,25 @@ function refreshTeamSelects(){
       else { badge.style.background='transparent'; badge.style.color=''; badge.textContent=''; }
     });
   });
+  const seasonSel = document.getElementById('s-season');
+  if(seasonSel && !seasonSel._saveListenerAdded){
+    seasonSel.addEventListener('change', saveScoreForm);
+    seasonSel._saveListenerAdded = true;
+  }
+  if(!_scoreFormRestored && currentUser && !currentUser.isGuest){
+    _scoreFormRestored = true;
+    restoreScoreForm();
+  }
 }
 
 function onMyTeamChange(){
   document.getElementById('s-my-name').textContent = document.getElementById('s-my-team').value || 'MY TEAM';
   populatePlayerDropdowns();
+  saveScoreForm();
 }
 function onOppTeamChange(){
   document.getElementById('s-opp-name').textContent = document.getElementById('s-opp-team').value || 'OPP';
+  saveScoreForm();
 }
 
 function populatePlayerDropdowns(){
@@ -456,6 +513,8 @@ function submitScore(){
 }
 
 function resetScoreForm(){
+  sessionStorage.removeItem('gcpScoreForm');
+  _scoreFormRestored = false;
   gameResults = GAMES.map(()=>({winner:null, players:[], forfeit:false}));
   collapseOpen = {};
   playerCount = 4;
