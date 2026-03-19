@@ -831,7 +831,15 @@ function saveTeamModal(){
   })).filter(p=>p.name);
   if(editingTeamIdx===null){
     if(D.teams.find(t=>t.name===name)){toast('同じ名前のチームが既にあります');return;}
-    D.teams.push({name,players}); toast(`${name} を追加しました`);
+    D.teams.push({name,players});
+    // 新チームの初期パスワードを設定
+    if(window.fbSavePassword) {
+      window.fbSavePassword(name, '123456').then(()=>{
+        toast(`${name} を追加しました（初期パスワード: 123456）`);
+      });
+    } else {
+      toast(`${name} を追加しました（初期パスワード: 123456）`);
+    }
   } else {
     D.teams[editingTeamIdx]={name,players}; toast(`${name} を更新しました`);
   }
