@@ -98,11 +98,11 @@ function saveScoreForm(){
     season:  document.getElementById('s-season')?.value   || '',
     gameResults, collapseOpen, playerCount, forfeitSinglesIdx
   };
-  try{ sessionStorage.setItem('gcpScoreForm', JSON.stringify(state)); }catch(e){}
+  try{ localStorage.setItem('gcpScoreForm', JSON.stringify(state)); }catch(e){}
 }
 
 function restoreScoreForm(){
-  const saved = sessionStorage.getItem('gcpScoreForm');
+  const saved = localStorage.getItem('gcpScoreForm');
   if(!saved) return;
   try{
     const s = JSON.parse(saved);
@@ -130,7 +130,7 @@ function restoreScoreForm(){
     updateLiveScore();
     updateProgress();
   }catch(e){
-    sessionStorage.removeItem('gcpScoreForm');
+    localStorage.removeItem('gcpScoreForm');
   }
 }
 
@@ -525,7 +525,7 @@ function submitScore(){
 }
 
 function resetScoreForm(){
-  sessionStorage.removeItem('gcpScoreForm');
+  localStorage.removeItem('gcpScoreForm');
   _scoreFormRestored = false;
   gameResults = GAMES.map(()=>({winner:null, players:[], forfeit:false}));
   collapseOpen = {};
