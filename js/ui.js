@@ -313,7 +313,7 @@ function renderHome(){
       stats[b].wins!==stats[a].wins ? stats[b].wins-stats[a].wins : stats[b].lw-stats[a].lw
     );
     let h = '<div class="robin-wrap"><table class="robin-table"><thead><tr><th>TEAM</th>';
-    sorted.forEach((t,i)=>{ h+=`<th>${["①","②","③","④"][i]}<br><small>${t}</small></th>`; });
+    sorted.forEach((t,i)=>{ h+=`<th>${["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"][i]||i+1}<br><small>${t}</small></th>`; });
     h += '<th>勝</th><th>負</th><th>LEG勝</th><th>LEG負</th><th>順位</th></tr></thead><tbody>';
     sorted.forEach((t2,ri)=>{
       const s=stats[t2]; const rank=ri+1;

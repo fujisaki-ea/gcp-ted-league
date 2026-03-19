@@ -226,6 +226,21 @@ function updateProgress(){
 }
 
 function refreshTeamSelects(){
+  // ログイン画面のチーム選択を動的に更新
+  const loginSel = document.getElementById('login-team-sel');
+  if(loginSel && D.teams && D.teams.length) {
+    const cur = loginSel.value;
+    loginSel.innerHTML = '<option value="">-- チームを選択 --</option>';
+    D.teams.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.name; o.textContent = t.name;
+      loginSel.appendChild(o);
+    });
+    const adminOpt = document.createElement('option');
+    adminOpt.value = '__admin__'; adminOpt.textContent = '管理者';
+    loginSel.appendChild(adminOpt);
+    if(cur) loginSel.value = cur;
+  }
   ['s-my-team','s-opp-team'].forEach(id=>{
     const sel=document.getElementById(id); if(!sel)return;
     const cur=sel.value;
