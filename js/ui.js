@@ -660,6 +660,7 @@ function renderTeams(){
           ${(currentUser && (currentUser.isAdmin || (currentUser.team===t.name))) ? `
           <button class="edit-btn" onclick="addPlayerInline(${i})">＋ 追加</button>
           <button class="edit-btn" style="${editStyle}" onclick="toggleDeleteMode(${i})">${editLabel}</button>
+          ${currentUser.isAdmin ? `<button class="edit-btn" style="border-color:var(--lose);color:var(--lose);" onclick="deleteTeam(${i})">🗑️</button>` : ''}
         ` : ''}
         </div>
       </div>
@@ -712,6 +713,15 @@ function toggleDeleteMode(teamIdx){
   deleteModeTeamIdx = (deleteModeTeamIdx === teamIdx) ? null : teamIdx;
   inlineEditing = null;
   renderTeams();
+}
+
+function deleteTeam(teamIdx){
+  const name = D.teams[teamIdx].name;
+  showConfirm('🗑️ チームを削除', `「${name}」を削除しますか？\nこの操作は元に戻せません。`, ()=>{
+    D.teams.splice(teamIdx, 1);
+    save(); renderTeams(); refreshTeamSelects(); refreshStatsTeamSel();
+    toast(`「${name}」を削除しました`);
+  }, '削除する');
 }
 
 function deletePlayer(teamIdx, playerIdx){
