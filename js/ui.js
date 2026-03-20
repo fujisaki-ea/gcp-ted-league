@@ -944,7 +944,7 @@ function showScoreResumeBanner(){
     <span style="font-size:13px;">⚠️ 入力途中のスコアデータがあります</span>
     <div style="display:flex;gap:8px;flex-shrink:0;">
       <button onclick="document.getElementById('score-resume-banner').remove();resetScoreForm();" style="background:transparent;border:1px solid #64748b;color:#94a3b8;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">破棄</button>
-      <button onclick="document.getElementById('score-resume-banner').remove();showView('score',document.querySelector('.nav-btn[onclick*=\\'score\\']'));" style="background:var(--accent,#3b82f6);border:none;color:#fff;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:700;">続きを入力</button>
+      <button onclick="document.getElementById('score-resume-banner').remove();_scoreFormRestored=false;showView('score',document.querySelector('.nav-btn[onclick*=\\'score\\']'));" style="background:var(--accent,#3b82f6);border:none;color:#fff;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:700;">続きを入力</button>
     </div>`;
   document.body.appendChild(banner);
 }
