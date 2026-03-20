@@ -117,7 +117,6 @@ function doLogout(){
   showConfirm('ログアウト', 'ログアウトしますか？', ()=>{
     sessionStorage.removeItem('gcpSession');
     sessionStorage.removeItem('gcpView');
-    resetScoreForm();
     const sc = document.getElementById('stats-content');
     if(sc) sc.innerHTML = '<div class="empty-state"><div class="ico">📊</div><p>チームを選択してください</p></div>';
     const statsSel = document.getElementById('stats-team-sel');
