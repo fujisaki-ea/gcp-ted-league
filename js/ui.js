@@ -377,13 +377,22 @@ function renderHome(){
 
       let statusHtml = '';
       if(p.status==='conflict'){
-        statusHtml = `<div style="color:var(--lose);font-size:12px;font-weight:700;margin-top:6px;">⚠️ スコアが一致しません。管理者が確認中です</div>`;
+        const btnStyle = 'margin-top:8px;padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;font-weight:700;';
         if(isAdmin){
-          statusHtml += `<div style="font-size:11px;color:var(--text2);margin-top:4px;">${p.teamX}申請: ${sx.scoreX}-${sx.scoreY}　${p.teamY}申請: ${sy.scoreX}-${sy.scoreY}</div>
+          statusHtml = `<div style="color:var(--lose);font-size:12px;font-weight:700;margin-top:6px;">⚠️ スコアが一致しません</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px;">${p.teamX}申請: ${sx.scoreX}-${sx.scoreY}　${p.teamY}申請: ${sy.scoreX}-${sy.scoreY}</div>
           <div style="display:flex;gap:6px;margin-top:8px;">
             <button onclick="forceApprovePending(${p.id})" style="padding:7px 12px;background:var(--win);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:700;">✅ ${p.teamX}の申請で承認</button>
             <button onclick="rejectPending(${p.id})" style="padding:7px 12px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 却下</button>
           </div>`;
+        } else if(isMySubmission){
+          statusHtml = `<div style="color:var(--lose);font-size:12px;font-weight:700;margin-top:6px;">⚠️ スコアが一致しません</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px;">あなたの申請: ${sx.scoreX}-${sx.scoreY}　相手の申請: ${sy.scoreX}-${sy.scoreY}</div>
+          <button onclick="resubmitConflict(${p.id})" style="${btnStyle}">✏️ 修正して再申請</button>`;
+        } else if(isOppSubmission){
+          statusHtml = `<div style="color:var(--lose);font-size:12px;font-weight:700;margin-top:6px;">⚠️ スコアが一致しません</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px;">あなたの申請: ${sy.scoreX}-${sy.scoreY}　相手の申請: ${sx.scoreX}-${sx.scoreY}</div>
+          <button onclick="resubmitConflict(${p.id})" style="${btnStyle}">✏️ 修正して再申請</button>`;
         }
       } else if(isMySubmission && !sy){
         const subAt = sx.submittedAt ? new Date(sx.submittedAt) : null;

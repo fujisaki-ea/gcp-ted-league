@@ -664,6 +664,77 @@ function forceApprovePending(id){
   }, '承認する');
 }
 
+function prefillScoreFormWithSubmission(myTeam, oppTeam, date, season, submission){
+  localStorage.removeItem('gcpScoreForm');
+  gameResults = GAMES.map((_,i)=>{
+    const g = (submission.games||[])[i] || {};
+    return {winner: g.winner||null, players: g.players||[], forfeit: false};
+  });
+  collapseOpen = {};
+  playerCount = 4;
+  forfeitSinglesIdx = null;
+  _scoreFormRestored = true;
+  const navBtn = document.querySelector('.nav-btn[onclick*="\'score\'"]');
+  showView('score', navBtn);
+  setTimeout(()=>{
+    const myTeamSel = document.getElementById('s-my-team');
+    const oppTeamSel = document.getElementById('s-opp-team');
+    const dateSel = document.getElementById('s-date');
+    const seasonSel = document.getElementById('s-season');
+    if(myTeamSel && [...myTeamSel.options].some(o=>o.value===myTeam)){
+      myTeamSel.value = myTeam;
+      onMyTeamChange(true);
+      document.getElementById('s-my-name').textContent = myTeam;
+    }
+    if(oppTeamSel && [...oppTeamSel.options].some(o=>o.value===oppTeam)){
+      oppTeamSel.value = oppTeam;
+      document.getElementById('s-opp-name').textContent = oppTeam;
+    }
+    if(dateSel && date) dateSel.value = date;
+    if(seasonSel && season) seasonSel.value = season;
+    buildGames(true);
+    populatePlayerDropdowns();
+    updateLiveScore();
+    updateProgress();
+    saveScoreForm();
+  }, 100);
+}
+
+async function resubmitConflict(id){
+  if(!D.pendingMatches) return;
+  const p = D.pendingMatches.find(x=>x.id===id);
+  if(!p || !currentUser) return;
+  const team = currentUser.team;
+
+  if(p.teamX === team){
+    showConfirm('✏️ 修正して再申請',
+      `スコアを修正して再申請します。\n現在の申請は取り消され、相手チームも再申請が必要になります。`,
+      async ()=>{
+        const submission = p.submissionX;
+        if(window.fbRemovePending && p._fbKey) await window.fbRemovePending(p._fbKey);
+        D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
+        try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+        renderHome();
+        prefillScoreFormWithSubmission(team, p.teamY, p.date, p.season, submission);
+      }, '修正する');
+
+  } else if(p.teamY === team){
+    showConfirm('✏️ 修正して再申請',
+      `スコアを修正して再申請します。`,
+      async ()=>{
+        const submission = p.submissionY;
+        p.submissionY = null;
+        p.status = 'pending';
+        if(window.fbUpdatePending && p._fbKey){
+          await window.fbUpdatePending(p._fbKey, {submissionY:null, status:'pending'});
+        }
+        try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+        renderHome();
+        prefillScoreFormWithSubmission(team, p.teamX, p.date, p.season, submission);
+      }, '修正する');
+  }
+}
+
 function rejectPending(id){
   if(!D.pendingMatches) D.pendingMatches = [];
   const p = D.pendingMatches.find(x=>x.id===id);
