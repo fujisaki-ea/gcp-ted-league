@@ -143,7 +143,7 @@ function lockMyTeam(team){
     sel.appendChild(opt);
   }
   sel.value = team;
-  onMyTeamChange();
+  onMyTeamChange(true);
 }
 
 function quickView(team){

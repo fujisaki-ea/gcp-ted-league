@@ -324,10 +324,10 @@ function refreshTeamSelects(){
   }
 }
 
-function onMyTeamChange(){
+function onMyTeamChange(skipSave=false){
   document.getElementById('s-my-name').textContent = document.getElementById('s-my-team').value || 'MY TEAM';
   populatePlayerDropdowns();
-  saveScoreForm();
+  if(!skipSave) saveScoreForm();
 }
 function onOppTeamChange(){
   document.getElementById('s-opp-name').textContent = document.getElementById('s-opp-team').value || 'OPP';
