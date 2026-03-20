@@ -108,6 +108,9 @@ function restoreScoreForm(){
     const s = JSON.parse(saved);
     // 管理者以外は自チームのデータのみ復元可能
     if(currentUser && !currentUser.isAdmin && s.myTeam && s.myTeam !== currentUser.team){
+      buildGames(true);
+      updateLiveScore();
+      updateProgress();
       return;
     }
     const myTeamSel  = document.getElementById('s-my-team');
