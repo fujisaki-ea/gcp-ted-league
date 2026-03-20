@@ -528,8 +528,7 @@ function submitScore(){
     }, '申請する');
 }
 
-function resetScoreForm(){
-  localStorage.removeItem('gcpScoreForm');
+function clearScoreFormUI(){
   _scoreFormRestored = false;
   gameResults = GAMES.map(()=>({winner:null, players:[], forfeit:false}));
   collapseOpen = {};
@@ -543,6 +542,10 @@ function resetScoreForm(){
   document.getElementById('s-my-score').textContent = '0';
   document.getElementById('s-opp-score').textContent = '0';
   updateProgress();
+}
+function resetScoreForm(){
+  localStorage.removeItem('gcpScoreForm');
+  clearScoreFormUI();
 }
 
 // ─────────────────────────────────────────
