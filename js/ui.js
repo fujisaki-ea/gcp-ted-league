@@ -932,6 +932,8 @@ function showScoreResumeBanner(){
   if(!raw) return;
   try{
     const s = JSON.parse(raw);
+    // 対戦チームが両方選択されていない場合は入力途中とみなさない
+    if(!s.myTeam || !s.oppTeam) return;
     // 管理者以外は自チームのデータのみ復元可能
     if(currentUser && !currentUser.isAdmin && s.myTeam && s.myTeam !== currentUser.team) return;
   }catch(e){ localStorage.removeItem('gcpScoreForm'); return; }
