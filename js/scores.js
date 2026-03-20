@@ -696,10 +696,12 @@ function rejectPending(id){
   }, '却下する');
 }
 
-function dismissRejectedNotif(id){
+async function dismissRejectedNotif(id){
   if(!D.rejectedNotifs) D.rejectedNotifs = [];
   const n = D.rejectedNotifs.find(x=>x.id===id);
-  if(n && window.fbRemoveNotif && n._fbKey) window.fbRemoveNotif(n._fbKey);
+  if(n && window.fbRemoveNotif && n._fbKey){
+    try{ await window.fbRemoveNotif(n._fbKey); }catch(e){ console.error('notif remove failed', e); }
+  }
   D.rejectedNotifs = D.rejectedNotifs.filter(x=>x.id!==id);
   try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
   renderHome();
