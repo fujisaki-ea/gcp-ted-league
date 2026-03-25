@@ -522,7 +522,10 @@ function submitScore(){
         const fbKey = await window.fbPushPending(pendingRec);
         pendingRec._fbKey = fbKey;
       }
-      D.pendingMatches.push(pendingRec);
+      // onValueで既に追加されている場合は重複を避ける
+      if(!pendingRec._fbKey || !D.pendingMatches.some(p=>p._fbKey===pendingRec._fbKey)){
+        D.pendingMatches.push(pendingRec);
+      }
       try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
       const gData = collectGameData();
       resetScoreForm();
