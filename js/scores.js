@@ -770,9 +770,11 @@ function rejectPending(id){
 async function dismissRejectedNotif(id){
   if(!D.rejectedNotifs) D.rejectedNotifs = [];
   const n = D.rejectedNotifs.find(x=>x.id===id);
+  let removed = false;
   if(n && window.fbRemoveNotif && n._fbKey){
-    try{ await window.fbRemoveNotif(n._fbKey); }catch(e){ console.error('notif remove failed', e); }
-  } else if(window.fbRemoveNotifById){
+    try{ await window.fbRemoveNotif(n._fbKey); removed = true; }catch(e){ console.error('notif remove failed', e); }
+  }
+  if(!removed && window.fbRemoveNotifById){
     try{ await window.fbRemoveNotifById(id); }catch(e){ console.error('notif remove by id failed', e); }
   }
   D.rejectedNotifs = D.rejectedNotifs.filter(x=>x.id!==id);
