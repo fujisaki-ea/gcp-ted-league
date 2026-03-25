@@ -772,6 +772,8 @@ async function dismissRejectedNotif(id){
   const n = D.rejectedNotifs.find(x=>x.id===id);
   if(n && window.fbRemoveNotif && n._fbKey){
     try{ await window.fbRemoveNotif(n._fbKey); }catch(e){ console.error('notif remove failed', e); }
+  } else if(window.fbRemoveNotifById){
+    try{ await window.fbRemoveNotifById(id); }catch(e){ console.error('notif remove by id failed', e); }
   }
   D.rejectedNotifs = D.rejectedNotifs.filter(x=>x.id!==id);
   try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}

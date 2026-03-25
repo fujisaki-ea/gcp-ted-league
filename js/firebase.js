@@ -78,6 +78,18 @@ window.fbPushNotif = async function(record) {
 window.fbRemoveNotif = function(fbKey) {
   return remove(ref(db, 'gcpLeague/rejectedNotifs/' + fbKey));
 };
+// _fbKey が不明な場合のフォールバック：id で検索して削除
+window.fbRemoveNotifById = async function(id) {
+  const snapshot = await get(notifsRef);
+  if(!snapshot.exists()) return;
+  const data = snapshot.val();
+  for(const [key, val] of Object.entries(data)) {
+    if(val.id === id) {
+      await remove(ref(db, 'gcpLeague/rejectedNotifs/' + key));
+      return;
+    }
+  }
+};
 
 // onValueで初回データ取得 → オーバーレイを消す → 以降もリアルタイム同期
 onValue(dataRef, (snapshot) => {
