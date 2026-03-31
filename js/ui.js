@@ -39,29 +39,51 @@ const FLIGHT_COLORS = {
   SA: {bg:'#fffacd', color:'#a07800'},
 };
 const ZERO_FLIGHT = [
-  {min:123.0, label:'SA'},
-  {min:95.0,  label:'AA'},
-  {min:80.0,  label:'A'},
-  {min:70.0,  label:'BB'},
-  {min:60.0,  label:'B'},
-  {min:50.0,  label:'CC'},
-  {min:40.0,  label:'C'},
+  {min:130.0, rating:18, label:'SA'},
+  {min:123.0, rating:17, label:'SA'},
+  {min:116.0, rating:16, label:'SA'},
+  {min:109.0, rating:15, label:'AA'},
+  {min:102.0, rating:14, label:'AA'},
+  {min: 95.0, rating:13, label:'AA'},
+  {min: 90.0, rating:12, label:'A'},
+  {min: 85.0, rating:11, label:'A'},
+  {min: 80.0, rating:10, label:'A'},
+  {min: 75.0, rating: 9, label:'BB'},
+  {min: 70.0, rating: 8, label:'BB'},
+  {min: 65.0, rating: 7, label:'B'},
+  {min: 60.0, rating: 6, label:'B'},
+  {min: 55.0, rating: 5, label:'CC'},
+  {min: 50.0, rating: 4, label:'CC'},
+  {min: 45.0, rating: 3, label:'C'},
+  {min: 40.0, rating: 2, label:'C'},
+  {min:  0.01, rating: 1, label:'C'},
 ];
 const CRICKET_FLIGHT = [
-  {min:4.50, label:'SA'},
-  {min:3.50, label:'AA'},
-  {min:2.90, label:'A'},
-  {min:2.50, label:'BB'},
-  {min:2.10, label:'B'},
-  {min:1.70, label:'CC'},
-  {min:1.30, label:'C'},
+  {min:4.75, rating:18, label:'SA'},
+  {min:4.50, rating:17, label:'SA'},
+  {min:4.25, rating:16, label:'SA'},
+  {min:4.00, rating:15, label:'AA'},
+  {min:3.75, rating:14, label:'AA'},
+  {min:3.50, rating:13, label:'AA'},
+  {min:3.30, rating:12, label:'A'},
+  {min:3.10, rating:11, label:'A'},
+  {min:2.90, rating:10, label:'A'},
+  {min:2.70, rating: 9, label:'BB'},
+  {min:2.50, rating: 8, label:'BB'},
+  {min:2.30, rating: 7, label:'B'},
+  {min:2.10, rating: 6, label:'B'},
+  {min:1.90, rating: 5, label:'CC'},
+  {min:1.70, rating: 4, label:'CC'},
+  {min:1.50, rating: 3, label:'C'},
+  {min:1.30, rating: 2, label:'C'},
+  {min:0.01, rating: 1, label:'C'},
 ];
 function getFlight(statsVal, isCricket) {
   const v = parseFloat(statsVal);
   if(isNaN(v) || v <= 0) return null;
   const table = isCricket ? CRICKET_FLIGHT : ZERO_FLIGHT;
   for(const f of table){
-    if(v >= f.min) return {...FLIGHT_COLORS[f.label], label:f.label};
+    if(v >= f.min) return {...FLIGHT_COLORS[f.label], label:f.label + f.rating};
   }
   return null;
 }
