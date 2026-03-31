@@ -27,6 +27,7 @@ const pwRef = ref(db, 'passwords');
 const pendingRef  = ref(db, 'gcpLeague/pendingMatches');
 const matchesRef  = ref(db, 'gcpLeague/matches');
 const notifsRef   = ref(db, 'gcpLeague/rejectedNotifs');
+const backupsRef  = ref(db, 'backups');
 
 // チームのみ部分更新（pendingMatches/matches/rejectedNotifs/schedule は上書きしない）
 window.fbSave = function(data) {
@@ -56,10 +57,44 @@ window.fbRemovePending = function(fbKey) {
   return remove(ref(db, 'gcpLeague/pendingMatches/' + fbKey));
 };
 
+// 自動バックアップ（backups/YYYYMMDD に matches + teams を保存、7日分保持）
+window.fbAutoBackup = async function(force = false) {
+  try {
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const backupPath = ref(db, `backups/${today}`);
+    if(!force) {
+      const existing = await get(backupPath);
+      if(existing.exists()) return;
+    }
+    const [matchSnap, teamSnap] = await Promise.all([
+      get(matchesRef),
+      get(ref(db, 'gcpLeague/teams'))
+    ]);
+    await set(backupPath, {
+      matches: matchSnap.exists() ? matchSnap.val() : {},
+      teams:   teamSnap.exists()  ? teamSnap.val()  : {},
+      savedAt: Date.now()
+    });
+    // 7日以上前のバックアップを削除
+    const allSnap = await get(backupsRef);
+    if(allSnap.exists()) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      const cutoffKey = cutoff.toISOString().slice(0, 10).replace(/-/g, '');
+      for(const k of Object.keys(allSnap.val())) {
+        if(k < cutoffKey) await remove(ref(db, `backups/${k}`));
+      }
+    }
+  } catch(e) {
+    console.error('Auto backup error:', e);
+  }
+};
+
 // matches: atomic push
 window.fbPushMatch = async function(record) {
   const clean = Object.fromEntries(Object.entries(record).filter(([k])=>k!=='_fbKey'));
   const r = await push(matchesRef, clean);
+  fbAutoBackup(true); // 試合追加後に強制バックアップ
   return r.key;
 };
 window.fbRemoveMatch = function(fbKey) {
@@ -108,6 +143,7 @@ onValue(dataRef, (snapshot) => {
       renderRobin(); renderHistory(); renderSchedule();
       renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
     }
+    fbAutoBackup(); // 1日1回バックアップ（当日分がなければ作成）
   }
 }, (error) => {
   // 接続エラー時

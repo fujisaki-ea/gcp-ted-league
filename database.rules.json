@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "gcpLeague": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "passwords": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "backups": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
