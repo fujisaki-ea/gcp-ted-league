@@ -595,6 +595,8 @@ async function autoApprovePending(pending){
   pending.status = 'approved';
 }
 
+const _autoApprovingIds = new Set();
+
 async function checkAutoApproval(){
   if(!D.pendingMatches) D.pendingMatches = [];
   const now = Date.now();
@@ -603,9 +605,12 @@ async function checkAutoApproval(){
   for(const p of [...D.pendingMatches]){
     if(p.status !== 'pending') continue;
     if(p.submissionY) continue;
+    if(_autoApprovingIds.has(p.id)) continue;
     const age = now - (p.submissionX?.submittedAt || 0);
     if(age >= limit72h){
+      _autoApprovingIds.add(p.id);
       await autoApprovePending(p);
+      _autoApprovingIds.delete(p.id);
       changed = true;
     }
   }
