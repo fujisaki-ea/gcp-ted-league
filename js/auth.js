@@ -131,7 +131,7 @@ function doLogout(){
     const teamsBtnL = document.getElementById('hdr-teams-btn');
     if(teamsBtnL) teamsBtnL.style.display = 'none';
     document.querySelectorAll('.nav-btn').forEach(b=>b.style.display='');
-    showView('score', document.querySelector('.nav-btn'));
+    showView('home', document.querySelector('.nav-btn[onclick*="\'home\'"]'));
   }, 'ログアウト');
 }
 

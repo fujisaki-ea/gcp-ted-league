@@ -167,7 +167,7 @@ function buildGames(skipSave=false){
       const initFlight = getFlight(saved.rating||'', isCricket);
       const initBadgeStyle = initFlight ? `background:${initFlight.bg};color:${initFlight.color};` : 'background:transparent;';
       const initBadgeText = initFlight ? initFlight.label : '';
-      playerRows += `<div class="player-entry" style="grid-template-columns:1fr 70px 36px;">
+      playerRows += `<div class="player-entry" style="grid-template-columns:1fr 70px 44px;">
         <select class="no-mb pe-name" onchange="onPlayerChange(${idx})"><option value="">— 選手 ${p+1} —</option></select>
         ${statsInput(isCricket, saved.rating||'')}
         <span class="pe-flight-badge" style="${initBadgeStyle}">${initBadgeText}</span>
@@ -399,7 +399,7 @@ function collectGameData(){
     const names   = pg ? [...pg.querySelectorAll('.pe-name')].map(s=>s.value) : [];
     const ratings = pg ? [...pg.querySelectorAll('.pe-rating')].map(s=>s.value) : [];
     const players = names.map((n,i)=>({name:n, rating:ratings[i]||''})).filter(p=>p.name);
-    return {game:gd.g, label:gd.label, winner:gameResults[idx].winner, players};
+    return {game:gd.g, label:gd.label, winner:gameResults[idx].winner, forfeit:!!gameResults[idx].forfeit, players};
   });
 }
 
@@ -677,7 +677,7 @@ function prefillScoreFormWithSubmission(myTeam, oppTeam, date, season, submissio
   localStorage.removeItem('gcpScoreForm');
   gameResults = GAMES.map((_,i)=>{
     const g = (submission.games||[])[i] || {};
-    return {winner: g.winner||null, players: g.players||[], forfeit: false};
+    return {winner: g.winner||null, players: g.players||[], forfeit: !!g.forfeit};
   });
   collapseOpen = {};
   playerCount = 4;
