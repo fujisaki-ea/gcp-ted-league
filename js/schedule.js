@@ -102,6 +102,12 @@ function calcHomeVenue(teamA, teamB){
   return { home: teamA, venue: 'GCP' };
 }
 
+function saveScheduleExtras(){
+  if(!window.fbSaveScheduleExtras) return;
+  const extras = (D.schedule||[]).filter(s=>!DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
+  window.fbSaveScheduleExtras(extras);
+}
+
 function addScheduleItem(){
   if(!currentUser || !currentUser.isAdmin){ toast('⚠️ 管理者のみ操作できます'); return; }
   const date   = document.getElementById('sch-date').value;
@@ -117,6 +123,7 @@ function addScheduleItem(){
   const {home, venue} = calcHomeVenue(teamA, teamB);
   D.schedule.push({ id: Date.now(), date, season, teamA, teamB, home, venue, note });
   save();
+  saveScheduleExtras();
   renderSchedule();
   document.getElementById('sch-date').value = '';
   document.getElementById('sch-note').value = '';
@@ -127,7 +134,9 @@ function deleteScheduleItem(id){
   if(!currentUser || !currentUser.isAdmin){ toast('⚠️ 管理者のみ操作できます'); return; }
   showConfirm('🗑️ 日程を削除', 'この日程を削除しますか？', ()=>{
     D.schedule = (D.schedule||[]).filter(s=>String(s.id)!==String(id));
-    save(); renderSchedule();
+    save();
+    saveScheduleExtras();
+    renderSchedule();
     toast('日程を削除しました');
   }, '削除する');
 }

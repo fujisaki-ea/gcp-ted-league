@@ -642,20 +642,29 @@ function cancelPending(id){
   if(!team){ toast('ログインが必要です'); return; }
   if(p.teamX===team && !p.submissionY){
     showConfirm('🗑️ 申請を取り消す', `${p.date} ${p.teamX} vs ${p.teamY} の申請を取り消しますか？`, async ()=>{
-      if(window.fbRemovePending && p._fbKey) await window.fbRemovePending(p._fbKey);
-      D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
-      try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-      renderHome(); renderHistory();
-      toast('申請を取り消しました');
+      try{
+        if(window.fbRemovePending && p._fbKey) await window.fbRemovePending(p._fbKey);
+        D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
+        try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+        renderHome(); renderHistory();
+        toast('申請を取り消しました');
+      }catch(e){
+        toast('❌ 取り消しに失敗しました。接続を確認してください');
+      }
     }, '取り消す');
   } else if(p.teamY===team && p.submissionY){
     showConfirm('🗑️ 申請を取り消す', `${p.date} ${p.teamX} vs ${p.teamY} の申請を取り消しますか？`, async ()=>{
-      p.submissionY = null;
-      p.status = 'pending';
-      if(window.fbUpdatePending && p._fbKey) await window.fbUpdatePending(p._fbKey, {submissionY:null, status:'pending'});
-      try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-      renderHome(); renderHistory();
-      toast('申請を取り消しました');
+      try{
+        p.submissionY = null;
+        p.status = 'pending';
+        if(window.fbUpdatePending && p._fbKey) await window.fbUpdatePending(p._fbKey, {submissionY:null, status:'pending'});
+        try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+        renderHome(); renderHistory();
+        toast('申請を取り消しました');
+      }catch(e){
+        p.submissionY = null;  // ローカルは巻き戻す
+        toast('❌ 取り消しに失敗しました。接続を確認してください');
+      }
     }, '取り消す');
   } else {
     toast('取り消せません');
@@ -674,18 +683,23 @@ function forceApprovePending(id){
     ? `${p.date} ${p.teamX} vs ${p.teamY} を強制承認しますか？`
     : `${p.date} ${p.teamX} vs ${p.teamY} の結果を承認しますか？`;
   showConfirm('✅ 承認', confirmMsg, async ()=>{
-    if(!p.submissionY){
-      p.submissionY = {
-        scoreX: p.submissionX.scoreX,
-        scoreY: p.submissionX.scoreY,
-        games: [],
-        submittedAt: Date.now()
-      };
+    try{
+      if(!p.submissionY){
+        p.submissionY = {
+          scoreX: p.submissionX.scoreX,
+          scoreY: p.submissionX.scoreY,
+          games: [],
+          submittedAt: Date.now()
+        };
+      }
+      await autoApprovePending(p);
+      try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+      renderHome(); renderHistory(); renderRobin();
+      toast('✅ 承認しました');
+    }catch(e){
+      p.submissionY = null;  // ローカルを巻き戻す
+      toast('❌ 承認に失敗しました。接続を確認してください');
     }
-    await autoApprovePending(p);
-    try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-    renderHome(); renderHistory(); renderRobin();
-    toast('✅ 承認しました');
   }, '承認する');
 }
 
@@ -769,26 +783,33 @@ function rejectPending(id){
   const isOpp = currentUser.team === p.teamY;
   if(!isAdmin && !isOpp){ toast('操作できません'); return; }
   showConfirm('❌ 申請を却下', `${p.date} ${p.teamX} vs ${p.teamY} の申請を却下しますか？\n申請チームに通知されます`, async ()=>{
-    if(!D.rejectedNotifs) D.rejectedNotifs = [];
-    const notif = {
-      id: Date.now(),
-      pendingId: p.id,
-      teamX: p.teamX,
-      teamY: p.teamY,
-      date: p.date,
-      rejectedAt: Date.now(),
-      rejectedBy: isAdmin ? '__admin__' : currentUser.team
-    };
-    if(window.fbPushNotif){
-      const fbKey = await window.fbPushNotif(notif);
-      notif._fbKey = fbKey;
+    try{
+      if(!D.rejectedNotifs) D.rejectedNotifs = [];
+      const notif = {
+        id: Date.now(),
+        pendingId: p.id,
+        teamX: p.teamX,
+        teamY: p.teamY,
+        date: p.date,
+        rejectedAt: Date.now(),
+        rejectedBy: isAdmin ? '__admin__' : currentUser.team
+      };
+      if(window.fbPushNotif){
+        const fbKey = await window.fbPushNotif(notif);
+        notif._fbKey = fbKey;
+      }
+      D.rejectedNotifs.push(notif);
+      // pending削除失敗でもnotif保存済みのため続行
+      if(window.fbRemovePending && p._fbKey){
+        try{ await window.fbRemovePending(p._fbKey); }catch(e){ console.error('pending削除失敗（却下通知は保存済み）:', e); }
+      }
+      D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
+      try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+      renderHome(); renderHistory();
+      toast('❌ 却下しました');
+    }catch(e){
+      toast('❌ 操作に失敗しました。接続を確認してください');
     }
-    D.rejectedNotifs.push(notif);
-    if(window.fbRemovePending && p._fbKey) await window.fbRemovePending(p._fbKey);
-    D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
-    try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-    renderHome(); renderHistory();
-    toast('❌ 却下しました');
   }, '却下する');
 }
 

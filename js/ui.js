@@ -96,7 +96,6 @@ function flightBadge(statsVal, isCricket) {
 // スタッツ入力欄HTML（ゼロワン/クリケット対応）
 function statsInput(isCricket, savedVal='') {
   const ph = isCricket ? '0.00' : '0.0';
-  const step = isCricket ? '0.01' : '0.1';
   return `<input type="text" inputmode="none" class="no-mb pe-rating pe-stats" data-cricket="${isCricket}" placeholder="${ph}" value="${savedVal}" onclick="openNumpad(this)" style="width:70px;padding:8px 6px;text-align:center;font-size:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);">`;
 }
 

@@ -90,6 +90,16 @@ window.fbAutoBackup = async function(force = false) {
   }
 };
 
+// schedule extras: デフォルト以外の日程を保存
+window.fbSaveScheduleExtras = function(items) {
+  if(!items || !items.length) {
+    return set(ref(db, 'gcpLeague/schedule'), null);
+  }
+  const obj = {};
+  items.forEach(item => { obj[item.id] = item; });
+  return set(ref(db, 'gcpLeague/schedule'), obj);
+};
+
 // matches: atomic push
 window.fbPushMatch = async function(record) {
   const clean = Object.fromEntries(Object.entries(record).filter(([k])=>k!=='_fbKey'));
