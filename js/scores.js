@@ -557,7 +557,11 @@ function resetScoreForm(){
 // ─────────────────────────────────────────
 //  PENDING MATCHES (承認ワークフロー)
 // ─────────────────────────────────────────
+const _autoApprovingIds = new Set();
+
 async function autoApprovePending(pending){
+  if(_autoApprovingIds.has(pending.id)) return;
+  _autoApprovingIds.add(pending.id);
   if(!D.pendingMatches) D.pendingMatches = [];
   const sx = pending.submissionX;
   const sy = pending.submissionY;
@@ -593,9 +597,8 @@ async function autoApprovePending(pending){
   }
   D.pendingMatches = D.pendingMatches.filter(p=>p.id!==pending.id);
   pending.status = 'approved';
+  _autoApprovingIds.delete(pending.id);
 }
-
-const _autoApprovingIds = new Set();
 
 async function checkAutoApproval(){
   if(!D.pendingMatches) D.pendingMatches = [];
@@ -608,9 +611,7 @@ async function checkAutoApproval(){
     if(_autoApprovingIds.has(p.id)) continue;
     const age = now - (p.submissionX?.submittedAt || 0);
     if(age >= limit72h){
-      _autoApprovingIds.add(p.id);
       await autoApprovePending(p);
-      _autoApprovingIds.delete(p.id);
       changed = true;
     }
   }
