@@ -439,15 +439,19 @@ function submitScore(){
     showConfirm('🎯 試合結果を送信',
       `${myTeam}  ${myWins} - ${oppWins}  ${oppTeam}\n\nロビン表へ即時反映されます`,
       async ()=>{
-        if(window.fbPushMatch){
-          const fbKey = await window.fbPushMatch(rec);
-          rec._fbKey = fbKey;
+        try{
+          if(window.fbPushMatch){
+            const fbKey = await window.fbPushMatch(rec);
+            rec._fbKey = fbKey;
+          }
+          D.matches.push(rec);
+          try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+          const gData = collectGameData();
+          resetScoreForm();
+          showResultSummary(myTeam, oppTeam, myWins, oppWins, gData);
+        }catch(e){
+          toast('❌ 送信に失敗しました。接続を確認して再度送信してください');
         }
-        D.matches.push(rec);
-        try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-        const gData = collectGameData();
-        resetScoreForm();
-        showResultSummary(myTeam, oppTeam, myWins, oppWins, gData);
       }, '送信する');
     return;
   }
@@ -471,26 +475,31 @@ function submitScore(){
       showConfirm('📤 試合結果を申請',
         `${myTeam}  ${myWins} - ${oppWins}  ${oppTeam}\n\n相手チームの申請と照合されます`,
         async ()=>{
-          existingPending.submissionY = submissionY;
-          const scoresMatch = existingPending.submissionX.scoreX === submissionY.scoreX &&
-                              existingPending.submissionX.scoreY === submissionY.scoreY;
-          if(scoresMatch){
-            await autoApprovePending(existingPending);
-          } else {
-            existingPending.status = 'conflict';
-            if(window.fbUpdatePending && existingPending._fbKey){
-              await window.fbUpdatePending(existingPending._fbKey, {submissionY, status:'conflict'});
+          try{
+            existingPending.submissionY = submissionY;
+            const scoresMatch = existingPending.submissionX.scoreX === submissionY.scoreX &&
+                                existingPending.submissionX.scoreY === submissionY.scoreY;
+            if(scoresMatch){
+              await autoApprovePending(existingPending);
+            } else {
+              existingPending.status = 'conflict';
+              if(window.fbUpdatePending && existingPending._fbKey){
+                await window.fbUpdatePending(existingPending._fbKey, {submissionY, status:'conflict'});
+              }
             }
+            try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+            const gData = collectGameData();
+            resetScoreForm();
+            if(existingPending.status === 'conflict'){
+              toast('⚠️ スコアが一致しません。管理者が確認します');
+            } else {
+              showResultSummary(myTeam, oppTeam, myWins, oppWins, gData);
+            }
+            renderHome(); renderHistory();
+          }catch(e){
+            existingPending.submissionY = null;
+            toast('❌ 送信に失敗しました。接続を確認して再度送信してください');
           }
-          try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-          const gData = collectGameData();
-          resetScoreForm();
-          if(existingPending.status === 'conflict'){
-            toast('⚠️ スコアが一致しません。管理者が確認します');
-          } else {
-            showResultSummary(myTeam, oppTeam, myWins, oppWins, gData);
-          }
-          renderHome(); renderHistory();
         }, '申請する');
     } else if(existingPending.teamX===myTeam && existingPending.teamY===oppTeam){
       toast(`⚠️ ${date} の ${myTeam} vs ${oppTeam} は既に申請中です`);
@@ -518,19 +527,23 @@ function submitScore(){
   showConfirm('📤 試合結果を申請',
     `${myTeam}  ${myWins} - ${oppWins}  ${oppTeam}\n\n相手チームの確認後にロビン表へ反映されます\n（3日以内に相手が未申請の場合は自動承認）`,
     async ()=>{
-      if(window.fbPushPending){
-        const fbKey = await window.fbPushPending(pendingRec);
-        pendingRec._fbKey = fbKey;
+      try{
+        if(window.fbPushPending){
+          const fbKey = await window.fbPushPending(pendingRec);
+          pendingRec._fbKey = fbKey;
+        }
+        // onValueで既に追加されている場合は重複を避ける
+        if(!pendingRec._fbKey || !D.pendingMatches.some(p=>p._fbKey===pendingRec._fbKey)){
+          D.pendingMatches.push(pendingRec);
+        }
+        try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+        const gData = collectGameData();
+        resetScoreForm();
+        toast('⏳ 申請しました。相手チームの確認をお待ちください');
+        renderHome(); renderHistory();
+      }catch(e){
+        toast('❌ 送信に失敗しました。接続を確認して再度送信してください');
       }
-      // onValueで既に追加されている場合は重複を避ける
-      if(!pendingRec._fbKey || !D.pendingMatches.some(p=>p._fbKey===pendingRec._fbKey)){
-        D.pendingMatches.push(pendingRec);
-      }
-      try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-      const gData = collectGameData();
-      resetScoreForm();
-      toast('⏳ 申請しました。相手チームの確認をお待ちください');
-      renderHome(); renderHistory();
     }, '申請する');
 }
 
@@ -592,8 +605,11 @@ async function autoApprovePending(pending){
   }
   D.matches.push(matchRec);
 
+  // pending削除を試みる。失敗してもmatchは保存済みのため続行
   if(window.fbRemovePending && pending._fbKey){
-    await window.fbRemovePending(pending._fbKey);
+    try{ await window.fbRemovePending(pending._fbKey); }catch(e){
+      console.error('pending削除失敗（matchは保存済み）:', e);
+    }
   }
   D.pendingMatches = D.pendingMatches.filter(p=>p.id!==pending.id);
   pending.status = 'approved';
