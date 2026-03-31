@@ -60,7 +60,8 @@ window.fbRemovePending = function(fbKey) {
 // 自動バックアップ（backups/YYYYMMDD に matches + teams を保存、7日分保持）
 window.fbAutoBackup = async function(force = false) {
   try {
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const _d = new Date();
+    const today = `${_d.getFullYear()}${String(_d.getMonth()+1).padStart(2,'0')}${String(_d.getDate()).padStart(2,'0')}`;
     const backupPath = ref(db, `backups/${today}`);
     if(!force) {
       const existing = await get(backupPath);
@@ -80,7 +81,7 @@ window.fbAutoBackup = async function(force = false) {
     if(allSnap.exists()) {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 7);
-      const cutoffKey = cutoff.toISOString().slice(0, 10).replace(/-/g, '');
+      const cutoffKey = `${cutoff.getFullYear()}${String(cutoff.getMonth()+1).padStart(2,'0')}${String(cutoff.getDate()).padStart(2,'0')}`;
       for(const k of Object.keys(allSnap.val())) {
         if(k < cutoffKey) await remove(ref(db, `backups/${k}`));
       }

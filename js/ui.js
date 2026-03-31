@@ -267,7 +267,7 @@ function renderHome(){
   }).join('');
 
   // ── 次の試合 ──
-  const todayStr2 = now.toISOString().slice(0,10);
+  const todayStr2 = todayStr();
   const upcomingAll = (D.schedule||[])
     .filter(s=> s.date >= todayStr2 && s.teamA && s.teamB)
     .sort((a,b)=>a.date.localeCompare(b.date));
@@ -605,7 +605,12 @@ function resetMatchHistory(){
   if(!currentUser || !currentUser.isAdmin){ toast('⚠️ 管理者のみ操作できます'); return; }
   if(!confirm('⚠️ 試合履歴をすべて削除します。\nこの操作は取り消せません。続けますか？')) return;
   D.matches = [];
-  if(window.fbClearMatches) window.fbClearMatches();
+  if(window.fbClearMatches){
+    window.fbClearMatches().catch(e=>{
+      console.error('fbClearMatches failed:', e);
+      toast('❌ Firebase削除に失敗しました。接続を確認してください');
+    });
+  }
   try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
   renderHistory();
   renderRobin();
@@ -617,11 +622,15 @@ function deleteMatch(e,id){
     toast('⚠️ 試合削除は管理者のみできます'); return;
   }
   showConfirm('🗑️ 削除確認', 'この試合を削除しますか？\n\n削除すると元に戻せません。', async ()=>{
-    const m = D.matches.find(x=>x.id===id);
-    if(m && window.fbRemoveMatch && m._fbKey) await window.fbRemoveMatch(m._fbKey);
-    D.matches = D.matches.filter(m=>m.id!==id);
-    try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-    renderHistory();
+    try{
+      const m = D.matches.find(x=>x.id===id);
+      if(m && window.fbRemoveMatch && m._fbKey) await window.fbRemoveMatch(m._fbKey);
+      D.matches = D.matches.filter(m=>m.id!==id);
+      try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+      renderHistory();
+    }catch(e){
+      toast('❌ 削除に失敗しました。接続を確認してください');
+    }
   }, '削除する');
 }
 
@@ -888,8 +897,11 @@ function saveTeamModal(){
     D.teams.push({name,players});
     // 新チームの初期パスワードを設定
     if(window.fbSavePassword) {
-      window.fbSavePassword(name, '123456').then(()=>{
-        toast(`${name} を追加しました（初期パスワード: 123456）`);
+      window.fbSavePassword(name, '123456').then(ok=>{
+        if(ok) toast(`${name} を追加しました（初期パスワード: 123456）`);
+        else   toast(`❌ パスワード設定に失敗しました。管理者から再設定してください`);
+      }).catch(()=>{
+        toast(`❌ パスワード設定に失敗しました。管理者から再設定してください`);
       });
     } else {
       toast(`${name} を追加しました（初期パスワード: 123456）`);

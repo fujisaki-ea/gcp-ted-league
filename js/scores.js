@@ -410,7 +410,7 @@ function submitScore(){
   const myTeam  = document.getElementById('s-my-team').value;
   const oppTeam = document.getElementById('s-opp-team').value;
   const date    = document.getElementById('s-date').value || todayStr();
-  const season  = document.getElementById('s-season').value || '2025';
+  const season  = document.getElementById('s-season').value || '2026';
   if(!myTeam||!oppTeam)               {toast('チームを選択してください');return;}
   if(myTeam===oppTeam)                 {toast('異なるチームを選択してください');return;}
   const unentered = gameResults.filter(r=>!r.winner).length;
@@ -498,6 +498,7 @@ function submitScore(){
             renderHome(); renderHistory();
           }catch(e){
             existingPending.submissionY = null;
+            existingPending.status = 'pending';
             toast('❌ 送信に失敗しました。接続を確認して再度送信してください');
           }
         }, '申請する');
@@ -749,27 +750,36 @@ async function resubmitConflict(id){
     showConfirm('✏️ 修正して再申請',
       `スコアを修正して再申請します。\n現在の申請は取り消され、相手チームも再申請が必要になります。`,
       async ()=>{
-        const submission = p.submissionX;
-        if(window.fbRemovePending && p._fbKey) await window.fbRemovePending(p._fbKey);
-        D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
-        try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-        renderHome();
-        prefillScoreFormWithSubmission(team, p.teamY, p.date, p.season, submission);
+        try{
+          const submission = p.submissionX;
+          if(window.fbRemovePending && p._fbKey) await window.fbRemovePending(p._fbKey);
+          D.pendingMatches = D.pendingMatches.filter(x=>x.id!==id);
+          try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+          renderHome();
+          prefillScoreFormWithSubmission(team, p.teamY, p.date, p.season, submission);
+        }catch(e){
+          toast('❌ 操作に失敗しました。接続を確認してください');
+        }
       }, '修正する');
 
   } else if(p.teamY === team){
     showConfirm('✏️ 修正して再申請',
       `スコアを修正して再申請します。`,
       async ()=>{
-        const submission = p.submissionY;
-        p.submissionY = null;
-        p.status = 'pending';
-        if(window.fbUpdatePending && p._fbKey){
-          await window.fbUpdatePending(p._fbKey, {submissionY:null, status:'pending'});
+        try{
+          const submission = p.submissionY;
+          p.submissionY = null;
+          p.status = 'pending';
+          if(window.fbUpdatePending && p._fbKey){
+            await window.fbUpdatePending(p._fbKey, {submissionY:null, status:'pending'});
+          }
+          try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
+          renderHome();
+          prefillScoreFormWithSubmission(team, p.teamX, p.date, p.season, submission);
+        }catch(e){
+          p.submissionY = null;
+          toast('❌ 操作に失敗しました。接続を確認してください');
         }
-        try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
-        renderHome();
-        prefillScoreFormWithSubmission(team, p.teamX, p.date, p.season, submission);
       }, '修正する');
   }
 }

@@ -8,7 +8,7 @@ const HOLIDAYS = {
 };
 
 function renderSchedule(){
-  const season = document.getElementById('schedule-season-sel')?.value || '2025';
+  const season = document.getElementById('schedule-season-sel')?.value || '2026';
   const c = document.getElementById('schedule-content');
   if(!c) return;
 
