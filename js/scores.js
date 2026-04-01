@@ -366,7 +366,6 @@ function refreshTeamSelects(){
     });
     if(D.teams.find(t=>t.name===cur)) sel.value=cur;
   });
-  buildTodayMemberUI();
   populatePlayerDropdowns();
   document.querySelectorAll('.pe-stats').forEach(input => {
     input.addEventListener('input', function(){
@@ -500,12 +499,9 @@ function submitScore(){
   const season  = document.getElementById('s-season').value || '2026';
   if(!myTeam||!oppTeam)               {toast('チームを選択してください');return;}
   if(myTeam===oppTeam)                 {toast('異なるチームを選択してください');return;}
-  // 当日参加メンバー選択チェック
-  if(todayMembers.length === 0){
-    toast('⚠️ 当日参加メンバーを選択してください（4〜7人）');return;
-  }
-  if(todayMembers.length < 4){
-    toast('⚠️ 当日参加メンバーを4人以上選択してください');return;
+  // 当日参加メンバー選択チェック（管理者はスキップ）
+  if(!currentUser.isAdmin && todayMembers.length === 0){
+    toast('⚠️ 当日参加メンバーを選択してください');return;
   }
   const unentered = gameResults.filter(r=>!r.winner).length;
   if(unentered > 0){
@@ -517,8 +513,8 @@ function submitScore(){
   const myWins  = gameResults.filter(r=>r.winner==='my').length;
   const oppWins = gameResults.filter(r=>r.winner==='opp').length;
   const games   = collectGameData();
-  // 最低出場回数チェック（当日メンバー全員が不戦敗以外のゲームで4回以上）
-  {
+  // 最低出場回数チェック（管理者以外、当日メンバー全員が不戦敗以外で4回以上）
+  if(!currentUser.isAdmin && todayMembers.length > 0){
     const appearances = {};
     games.forEach(g=>{
       if(g.forfeit) return;
@@ -608,10 +604,10 @@ function submitScore(){
               }
               // 両チームに conflict 通知を送る
               if(!D.rejectedNotifs) D.rejectedNotifs = [];
-              const now = Date.now();
+              const mkId = () => Date.now() * 1000 + Math.floor(Math.random() * 1000);
               for(const notifTeam of [existingPending.teamX, existingPending.teamY]){
                 const conflictNotif = {
-                  id: now + (notifTeam===existingPending.teamX ? 0 : 1),
+                  id: mkId(),
                   pendingId: existingPending.id,
                   teamX: existingPending.teamX,
                   teamY: existingPending.teamY,
@@ -855,6 +851,7 @@ function prefillScoreFormWithSubmission(myTeam, oppTeam, date, season, submissio
   collapseOpen = {};
   playerCount = 4;
   forfeitSinglesIdx = null;
+  todayMembers = [];
   _scoreFormRestored = true;
   const navBtn = document.querySelector('.nav-btn[onclick*="\'score\'"]');
   showView('score', navBtn);
