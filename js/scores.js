@@ -422,19 +422,13 @@ function populatePlayerDropdowns(){
     return selected;
   }
 
-  // 全ゲームの選手出場回数を集計（確定済みゲームはgameResultsから読む）
+  // 全ゲームの選手出場回数を集計（常にgameResults.playersから読む）
+  // buildGames()はDOM→gameResultsを保存してからDOMを再構築するため
+  // DOM再構築後はセレクトが空になるが、gameResultsには最新値が残っている
   const selectCount = {};
   GAMES.forEach((_, i) => {
-    if(gameResults[i].winner !== null){
-      // 確定済みゲームはgameResults.playersから集計
-      (gameResults[i].players||[]).forEach(p=>{
-        if(p.name) selectCount[p.name] = (selectCount[p.name]||0) + 1;
-      });
-      return;
-    }
-    const pg = document.getElementById('pg-'+i); if(!pg) return;
-    [...pg.querySelectorAll('.pe-name')].forEach(s => {
-      if(s.value) selectCount[s.value] = (selectCount[s.value] || 0) + 1;
+    (gameResults[i].players||[]).forEach(p=>{
+      if(p.name) selectCount[p.name] = (selectCount[p.name]||0) + 1;
     });
   });
   const circleNum = n => ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][n-1] || `(${n})`;
@@ -476,6 +470,10 @@ function populatePlayerDropdowns(){
 
 function onPlayerChange(idx){
   const pg = document.getElementById('pg-'+idx); if(!pg) return;
+  // 変更されたゲームのDOMをgameResultsに先に同期してからカウント
+  const names   = [...pg.querySelectorAll('.pe-name')].map(s=>s.value);
+  const ratings = [...pg.querySelectorAll('.pe-rating')].map(s=>s.value);
+  gameResults[idx].players = names.map((n,i)=>({name:n,rating:ratings[i]||''}));
   populatePlayerDropdowns();
 }
 
