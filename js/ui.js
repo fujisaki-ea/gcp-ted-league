@@ -374,12 +374,20 @@ function renderHome(){
     const isAdmin = currentUser.isAdmin;
 
     const myNotifs = isAdmin ? [] : notifs.filter(n=>n.teamX===myTeam||n.teamY===myTeam);
-    const notifsHtml = myNotifs.map(n=>`
-      <div style="background:rgba(240,51,85,.08);border:1px solid rgba(240,51,85,.3);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-        <div style="font-size:12px;font-weight:700;color:var(--lose);">❌ 申請が却下されました</div>
+    const notifsHtml = myNotifs.map(n=>{
+      const isConflict = n.type === 'conflict';
+      const bg    = isConflict ? 'rgba(255,153,0,.08)' : 'rgba(240,51,85,.08)';
+      const bd    = isConflict ? 'rgba(255,153,0,.4)'  : 'rgba(240,51,85,.3)';
+      const color = isConflict ? '#e08000'              : 'var(--lose)';
+      const title = isConflict ? '⚠️ スコアが一致しません（要修正・再申請）' : '❌ 申請が却下されました';
+      const sub   = isConflict ? `<div style="font-size:11px;color:var(--text2);margin-top:3px;">スコアを確認し、スコア入力画面から修正して再申請してください。</div>` : '';
+      return `<div style="background:${bg};border:1px solid ${bd};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:700;color:${color};">${title}</div>
         <div style="font-size:12px;margin-top:4px;">${n.date}　${n.teamX} vs ${n.teamY}</div>
+        ${sub}
         <button onclick="dismissRejectedNotif(${n.id})" style="margin-top:8px;padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">確認しました</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     let myPendings = [];
     if(isAdmin){

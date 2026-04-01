@@ -6,6 +6,7 @@ const SINGLES_IDX  = [4, 8, 10, 13];
 
 let playerCount = 4;
 let forfeitSinglesIdx = null;
+let todayMembers = []; // 当日参加選手名の配列（4〜7人）
 
 function setPlayerCount(n){
   playerCount = n;
@@ -84,6 +85,64 @@ function clearForfeit(idx){
 }
 
 // ─────────────────────────────────────────
+//  TODAY MEMBERS（当日参加メンバー選択）
+// ─────────────────────────────────────────
+function buildTodayMemberUI(){
+  const myName = document.getElementById('s-my-team').value;
+  const team   = D.teams.find(t=>t.name===myName);
+  const allMembers = team ? (team.players||[]) : [];
+  const wrap = document.getElementById('today-members-wrap');
+  if(!wrap) return;
+
+  if(!myName){
+    wrap.innerHTML = '<div style="font-size:11px;color:var(--text2);padding:2px 0;">チームを選択後にメンバーが表示されます</div>';
+    updateTodayMemberCount();
+    return;
+  }
+  if(!allMembers.length){
+    wrap.innerHTML = '<div style="font-size:11px;color:var(--text2);padding:2px 0;">メンバーが登録されていません</div>';
+    updateTodayMemberCount();
+    return;
+  }
+
+  wrap.innerHTML = allMembers.map(m=>{
+    const sel = todayMembers.includes(m.name);
+    return `<label style="display:inline-flex;align-items:center;padding:5px 11px;border:1px solid ${sel?'var(--accent)':'var(--border)'};border-radius:20px;font-size:12px;cursor:pointer;margin:2px;background:${sel?'var(--accent)':'transparent'};color:${sel?'#fff':'var(--text1)'};">
+      <input type="checkbox" style="display:none;" value="${m.name}" ${sel?'checked':''} onchange="onTodayMemberChange(this)">
+      ${m.name}
+    </label>`;
+  }).join('');
+  updateTodayMemberCount();
+}
+
+function onTodayMemberChange(cb){
+  const name = cb.value;
+  if(cb.checked){
+    if(todayMembers.length >= 7){
+      toast('⚠️ 参加メンバーは最大7人です');
+      todayMembers = todayMembers.filter(n=>n!==name);
+    } else {
+      if(!todayMembers.includes(name)) todayMembers.push(name);
+    }
+  } else {
+    todayMembers = todayMembers.filter(n=>n!==name);
+  }
+  buildTodayMemberUI();
+  setPlayerCount(Math.max(todayMembers.length, 1));
+  populatePlayerDropdowns();
+  saveScoreForm();
+}
+
+function updateTodayMemberCount(){
+  const el = document.getElementById('today-member-count');
+  if(!el) return;
+  const n = todayMembers.length;
+  const ok = n >= 4 && n <= 7;
+  el.textContent = n > 0 ? `${n}人選択中` : '未選択';
+  el.style.color = ok ? 'var(--win)' : (n > 0 ? 'var(--lose)' : 'var(--text2)');
+}
+
+// ─────────────────────────────────────────
 //  SCORE INPUT
 // ─────────────────────────────────────────
 let gameResults = GAMES.map(()=>({winner:null, players:[],forfeit:false}));
@@ -96,7 +155,7 @@ function saveScoreForm(){
     myTeam:  document.getElementById('s-my-team')?.value  || '',
     oppTeam: document.getElementById('s-opp-team')?.value || '',
     season:  document.getElementById('s-season')?.value   || '',
-    gameResults, collapseOpen, playerCount, forfeitSinglesIdx
+    gameResults, collapseOpen, playerCount, forfeitSinglesIdx, todayMembers
   };
   try{ localStorage.setItem('gcpScoreForm', JSON.stringify(state)); }catch(e){}
 }
@@ -129,9 +188,11 @@ function restoreScoreForm(){
     collapseOpen      = s.collapseOpen || {};
     playerCount       = s.playerCount  || 4;
     forfeitSinglesIdx = s.forfeitSinglesIdx ?? null;
+    todayMembers      = s.todayMembers || [];
     document.querySelectorAll('.player-count-btn').forEach(b=>{
       b.classList.toggle('active', parseInt(b.dataset.count)===playerCount);
     });
+    buildTodayMemberUI();
     buildGames(true);
     populatePlayerDropdowns();
     updateLiveScore();
@@ -305,6 +366,7 @@ function refreshTeamSelects(){
     });
     if(D.teams.find(t=>t.name===cur)) sel.value=cur;
   });
+  buildTodayMemberUI();
   populatePlayerDropdowns();
   document.querySelectorAll('.pe-stats').forEach(input => {
     input.addEventListener('input', function(){
@@ -328,7 +390,9 @@ function refreshTeamSelects(){
 }
 
 function onMyTeamChange(skipSave=false){
+  todayMembers = []; // チーム変更時はリセット
   document.getElementById('s-my-name').textContent = document.getElementById('s-my-team').value || 'MY TEAM';
+  buildTodayMemberUI();
   populatePlayerDropdowns();
   if(!skipSave) saveScoreForm();
 }
@@ -340,7 +404,11 @@ function onOppTeamChange(){
 function populatePlayerDropdowns(){
   const myName = document.getElementById('s-my-team').value;
   const team   = D.teams.find(t=>t.name===myName);
-  const members = team ? team.players : [];
+  const allMembers = team ? (team.players||[]) : [];
+  // 当日参加メンバーのみに絞り込む（未選択の場合は全員）
+  const members = todayMembers.length > 0
+    ? allMembers.filter(m=>todayMembers.includes(m.name))
+    : allMembers;
 
   const singlesIndices = GAMES.map((gd,i)=>gd.n===1?i:-1).filter(i=>i>=0);
 
@@ -355,10 +423,16 @@ function populatePlayerDropdowns(){
     return selected;
   }
 
-  // 全ゲームの選手出場回数を集計
+  // 全ゲームの選手出場回数を集計（確定済みゲームはgameResultsから読む）
   const selectCount = {};
   GAMES.forEach((_, i) => {
-    if(gameResults[i].winner !== null) return;
+    if(gameResults[i].winner !== null){
+      // 確定済みゲームはgameResults.playersから集計
+      (gameResults[i].players||[]).forEach(p=>{
+        if(p.name) selectCount[p.name] = (selectCount[p.name]||0) + 1;
+      });
+      return;
+    }
     const pg = document.getElementById('pg-'+i); if(!pg) return;
     [...pg.querySelectorAll('.pe-name')].forEach(s => {
       if(s.value) selectCount[s.value] = (selectCount[s.value] || 0) + 1;
@@ -426,6 +500,13 @@ function submitScore(){
   const season  = document.getElementById('s-season').value || '2026';
   if(!myTeam||!oppTeam)               {toast('チームを選択してください');return;}
   if(myTeam===oppTeam)                 {toast('異なるチームを選択してください');return;}
+  // 当日参加メンバー選択チェック
+  if(todayMembers.length === 0){
+    toast('⚠️ 当日参加メンバーを選択してください（4〜7人）');return;
+  }
+  if(todayMembers.length < 4){
+    toast('⚠️ 当日参加メンバーを4人以上選択してください');return;
+  }
   const unentered = gameResults.filter(r=>!r.winner).length;
   if(unentered > 0){
     toast(`あと ${unentered} ゲームの勝敗を入力してください`);return;
@@ -436,6 +517,18 @@ function submitScore(){
   const myWins  = gameResults.filter(r=>r.winner==='my').length;
   const oppWins = gameResults.filter(r=>r.winner==='opp').length;
   const games   = collectGameData();
+  // 最低出場回数チェック（当日メンバー全員が不戦敗以外のゲームで4回以上）
+  {
+    const appearances = {};
+    games.forEach(g=>{
+      if(g.forfeit) return;
+      (g.players||[]).forEach(p=>{ if(p.name) appearances[p.name]=(appearances[p.name]||0)+1; });
+    });
+    const underPlayed = todayMembers.filter(name=>(appearances[name]||0)<4);
+    if(underPlayed.length > 0){
+      toast(`⚠️ 出場回数が4回未満の選手がいます：${underPlayed.join('、')}`);return;
+    }
+  }
 
   const ei = D.matches.findIndex(m=>
     m.date===date &&
@@ -490,21 +583,55 @@ function submitScore(){
         async ()=>{
           try{
             existingPending.submissionY = submissionY;
+            // スコア合計の一致確認
             const scoresMatch = existingPending.submissionX.scoreX === submissionY.scoreX &&
                                 existingPending.submissionX.scoreY === submissionY.scoreY;
+            // 各ゲームの勝敗一致確認（合計が合っていても個別が矛盾する場合を検出）
+            let gamesMatch = true;
             if(scoresMatch){
+              const gamesX = existingPending.submissionX.games || [];
+              const gamesY = submissionY.games || [];
+              for(let i=0; i<Math.min(gamesX.length, gamesY.length); i++){
+                if(gamesX[i]?.forfeit || gamesY[i]?.forfeit) continue;
+                const wx = gamesX[i]?.winner;
+                const wy = gamesY[i]?.winner;
+                // wx==='my'はX勝利, wy==='my'はY勝利 → 同じなら矛盾
+                if(wx && wy && wx === wy){ gamesMatch = false; break; }
+              }
+            }
+            if(scoresMatch && gamesMatch){
               await autoApprovePending(existingPending);
             } else {
               existingPending.status = 'conflict';
               if(window.fbUpdatePending && existingPending._fbKey){
                 await window.fbUpdatePending(existingPending._fbKey, {submissionY, status:'conflict'});
               }
+              // 両チームに conflict 通知を送る
+              if(!D.rejectedNotifs) D.rejectedNotifs = [];
+              const now = Date.now();
+              for(const notifTeam of [existingPending.teamX, existingPending.teamY]){
+                const conflictNotif = {
+                  id: now + (notifTeam===existingPending.teamX ? 0 : 1),
+                  pendingId: existingPending.id,
+                  teamX: existingPending.teamX,
+                  teamY: existingPending.teamY,
+                  date: existingPending.date,
+                  type: 'conflict',
+                  forTeam: notifTeam,
+                  rejectedAt: now
+                };
+                if(window.fbPushNotif){
+                  const fbKey = await window.fbPushNotif(conflictNotif);
+                  conflictNotif._fbKey = fbKey;
+                }
+                D.rejectedNotifs.push(conflictNotif);
+              }
             }
             try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
             const gData = collectGameData();
             resetScoreForm();
             if(existingPending.status === 'conflict'){
-              toast('⚠️ スコアが一致しません。管理者が確認します');
+              toast('⚠️ スコアが一致しません。修正して再申請してください');
             } else {
               showResultSummary(myTeam, oppTeam, myWins, oppWins, gData);
             }
@@ -567,10 +694,12 @@ function clearScoreFormUI(){
   collapseOpen = {};
   playerCount = 4;
   forfeitSinglesIdx = null;
+  todayMembers = [];
   document.querySelectorAll('.player-count-btn').forEach(b=>{
     b.classList.toggle('active', b.dataset.count==='4');
   });
   document.getElementById('forfeit-notice').style.display='none';
+  buildTodayMemberUI();
   buildGames(true);
   document.getElementById('s-my-score').textContent = '0';
   document.getElementById('s-opp-score').textContent = '0';

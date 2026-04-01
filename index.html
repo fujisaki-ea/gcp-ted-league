@@ -104,7 +104,14 @@
         <option value="2028">2028</option><option value="2029">2029</option><option value="2030">2030</option>
       </select>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:4px;">
+    <div style="margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <span style="font-size:11px;color:var(--text2);">当日参加メンバー（4〜7人）</span>
+        <span id="today-member-count" style="font-size:11px;font-weight:700;color:var(--text2);">未選択</span>
+      </div>
+      <div id="today-members-wrap" style="line-height:2;"></div>
+    </div>
+    <div style="display:none;">
       <button class="player-count-btn active" data-count="4" onclick="setPlayerCount(4)">4人+</button>
       <button class="player-count-btn" data-count="3" onclick="setPlayerCount(3)">3人</button>
       <button class="player-count-btn" data-count="2" onclick="setPlayerCount(2)">2人</button>
