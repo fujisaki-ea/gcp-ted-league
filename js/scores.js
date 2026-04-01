@@ -355,6 +355,16 @@ function populatePlayerDropdowns(){
     return selected;
   }
 
+  // 全ゲームの選手出場回数を集計
+  const selectCount = {};
+  GAMES.forEach((_, i) => {
+    const pg = document.getElementById('pg-'+i); if(!pg) return;
+    [...pg.querySelectorAll('.pe-name')].forEach(s => {
+      if(s.value) selectCount[s.value] = (selectCount[s.value] || 0) + 1;
+    });
+  });
+  const circleNum = n => ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][n-1] || `(${n})`;
+
   GAMES.forEach((gd,idx)=>{
     const pg = document.getElementById('pg-'+idx); if(!pg) return;
     const isSingles = gd.n === 1;
@@ -372,12 +382,14 @@ function populatePlayerDropdowns(){
         if(!m.name || otherSelected.includes(m.name)) return;
         const o = document.createElement('option');
         o.value = m.name;
+        const cnt = selectCount[m.name] || 0;
+        const suffix = cnt > 0 ? ` ${circleNum(cnt)}` : '';
         if(isSingles && singlesUsed.has(m.name)){
-          o.textContent = m.name + '（シングルス出場済み）';
+          o.textContent = m.name + suffix + '（シングルス出場済み）';
           o.disabled = true;
           o.style.color = 'var(--text2)';
         } else {
-          o.textContent = m.name;
+          o.textContent = m.name + suffix;
         }
         sel.appendChild(o);
       });
