@@ -358,6 +358,7 @@ function populatePlayerDropdowns(){
   // 全ゲームの選手出場回数を集計
   const selectCount = {};
   GAMES.forEach((_, i) => {
+    if(gameResults[i].winner !== null) return;
     const pg = document.getElementById('pg-'+i); if(!pg) return;
     [...pg.querySelectorAll('.pe-name')].forEach(s => {
       if(s.value) selectCount[s.value] = (selectCount[s.value] || 0) + 1;
