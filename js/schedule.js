@@ -104,8 +104,7 @@ function calcHomeVenue(teamA, teamB){
 
 function saveScheduleExtras(){
   if(!window.fbSaveScheduleExtras) return;
-  const extras = (D.schedule||[]).filter(s=>!DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
-  window.fbSaveScheduleExtras(extras);
+  window.fbSaveScheduleExtras(D.schedule||[]);
 }
 
 function addScheduleItem(){
