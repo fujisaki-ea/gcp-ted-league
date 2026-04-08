@@ -946,18 +946,22 @@ function saveTeamModal(){
         if(Object.keys(upd).length && n._fbKey && window.fbUpdateNotif)
           window.fbUpdateNotif(n._fbKey, upd);
       });
-      // schedule のチーム名を更新（teamA/teamB/home すべて）
-      // D.schedule の各アイテムは DEFAULT_SCHEDULE_2026 の同一参照のため、コピーして更新する
-      let scheduleChanged = false;
+      // DEFAULT_SCHEDULE_2026 を直接書き換え（onValueが何度呼ばれても新名前が基準になる）
+      DEFAULT_SCHEDULE_2026.forEach(d=>{
+        if(d.teamA===oldName) d.teamA = name;
+        if(d.teamB===oldName) d.teamB = name;
+        if(d.home===oldName)  d.home  = name;
+      });
+      // D.schedule も同期（既存アイテムを新名前のコピーに置換）
       D.schedule = (D.schedule||[]).map(s=>{
         const upd = {};
-        if(s.teamA===oldName){ upd.teamA=name; scheduleChanged=true; }
-        if(s.teamB===oldName){ upd.teamB=name; scheduleChanged=true; }
-        if(s.home===oldName) { upd.home=name;  scheduleChanged=true; }
+        if(s.teamA===oldName){ upd.teamA=name; }
+        if(s.teamB===oldName){ upd.teamB=name; }
+        if(s.home===oldName) { upd.home=name;  }
         return Object.keys(upd).length ? {...s, ...upd} : s;
       });
-      if(scheduleChanged && window.fbSaveScheduleExtras)
-        window.fbSaveScheduleExtras(D.schedule);
+      // Firebase にも保存（ページ再読込後の永続化用）
+      if(window.fbSaveScheduleExtras) window.fbSaveScheduleExtras(D.schedule);
       // パスワードキーを付け替え
       if(window.fbRenamePasswordKey) window.fbRenamePasswordKey(oldName, name);
       toast(`「${oldName}」→「${name}」に変更しました`);
