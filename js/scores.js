@@ -418,14 +418,17 @@ function populatePlayerDropdowns(){
     return selected;
   }
 
-  // 全ゲームの選手出場回数を集計（常にgameResults.playersから読む）
+  // ゲームごとの累積出場回数を事前計算（0〜idx のゲームだけカウント）
   // buildGames()はDOM→gameResultsを保存してからDOMを再構築するため
   // DOM再構築後はセレクトが空になるが、gameResultsには最新値が残っている
-  const selectCount = {};
+  const cumulativeCounts = []; // cumulativeCounts[idx][name] = そのゲームまでの出場数
+  const running = {};
   GAMES.forEach((_, i) => {
     (gameResults[i].players||[]).forEach(p=>{
-      if(p.name) selectCount[p.name] = (selectCount[p.name]||0) + 1;
+      if(p.name) running[p.name] = (running[p.name]||0) + 1;
     });
+    cumulativeCounts[i] = {...running};
+    console.log(`[DEBUG] cumulativeCounts[${i}]:`, JSON.stringify(cumulativeCounts[i]));
   });
   const circleNum = n => ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][n-1] || `(${n})`;
 
@@ -433,6 +436,8 @@ function populatePlayerDropdowns(){
     const pg = document.getElementById('pg-'+idx); if(!pg) return;
     const isSingles = gd.n === 1;
     const allSels = [...pg.querySelectorAll('.pe-name')];
+    const selectCount = cumulativeCounts[idx] || {};
+    console.log(`[DEBUG] game${idx+1} selectCount:`, JSON.stringify(selectCount));
     allSels.forEach((sel, si)=>{
       const cur = sel.value;
       const otherSelected = allSels
