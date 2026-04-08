@@ -946,11 +946,15 @@ function saveTeamModal(){
         if(Object.keys(upd).length && n._fbKey && window.fbUpdateNotif)
           window.fbUpdateNotif(n._fbKey, upd);
       });
-      // schedule のチーム名を更新
+      // schedule のチーム名を更新（teamA/teamB/home すべて）
+      // D.schedule の各アイテムは DEFAULT_SCHEDULE_2026 の同一参照のため、コピーして更新する
       let scheduleChanged = false;
-      (D.schedule||[]).forEach(s=>{
-        if(s.teamA===oldName){ s.teamA=name; scheduleChanged=true; }
-        if(s.teamB===oldName){ s.teamB=name; scheduleChanged=true; }
+      D.schedule = (D.schedule||[]).map(s=>{
+        const upd = {};
+        if(s.teamA===oldName){ upd.teamA=name; scheduleChanged=true; }
+        if(s.teamB===oldName){ upd.teamB=name; scheduleChanged=true; }
+        if(s.home===oldName) { upd.home=name;  scheduleChanged=true; }
+        return Object.keys(upd).length ? {...s, ...upd} : s;
       });
       if(scheduleChanged && window.fbSaveScheduleExtras)
         window.fbSaveScheduleExtras(D.schedule);
@@ -963,7 +967,7 @@ function saveTeamModal(){
   }
   inlineEditing = null;
   deleteModeTeamIdx = null;
-  save(); closeModal('modal-team'); renderTeams(); refreshTeamSelects();
+  save(); closeModal('modal-team'); renderTeams(); refreshTeamSelects(); renderSchedule();
 }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 
