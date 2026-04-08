@@ -123,6 +123,7 @@ input.no-mb,select.no-mb{margin-bottom:0;}
 .game-row.decided-win  {border-left:4px solid var(--win);}
 .game-row.decided-lose {border-left:4px solid var(--lose);}
 .game-row.is-forfeit   {border-left:4px solid var(--border2); opacity:0.45; pointer-events:none;}
+.game-row.input-locked {opacity:0.4; pointer-events:none;}
 
 .game-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
 /* ▼ ゲーム番号を大きく */

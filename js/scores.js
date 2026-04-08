@@ -215,11 +215,19 @@ function buildGames(skipSave=false){
   }
   const wrap = document.getElementById('games-wrap');
   wrap.innerHTML = '';
+  const myTeamVal  = document.getElementById('s-my-team')?.value;
+  const oppTeamVal = document.getElementById('s-opp-team')?.value;
+  const teamsReady = !!(oppTeamVal && todayMembers.length > 0);
+
   GAMES.forEach((gd, idx) => {
     const r = gameResults[idx];
     const decided  = r.winner !== null;
     const isForfeit = !!r.forfeit;
     const collapsed = decided && !collapseOpen[idx];
+
+    // 前ゲームに未決定があれば入力不可
+    const prevPending = !isForfeit && gameResults.slice(0, idx).some(pr => pr.winner === null && !pr.forfeit);
+    const inputLocked = !teamsReady || prevPending;
 
     const isCricket = gd.label.includes('クリケット');
     let playerRows = '';
@@ -228,9 +236,10 @@ function buildGames(skipSave=false){
       const initFlight = getFlight(saved.rating||'', isCricket);
       const initBadgeStyle = initFlight ? `background:${initFlight.bg};color:${initFlight.color};` : 'background:transparent;';
       const initBadgeText = initFlight ? initFlight.label : '';
+      const disAttr = inputLocked ? 'disabled' : '';
       playerRows += `<div class="player-entry" style="grid-template-columns:1fr 70px 44px;">
-        <select class="no-mb pe-name" onchange="onPlayerChange(${idx})"><option value="">— 選手 ${p+1} —</option></select>
-        ${statsInput(isCricket, saved.rating||'')}
+        <select class="no-mb pe-name" onchange="onPlayerChange(${idx})" ${disAttr}><option value="">— 選手 ${p+1} —</option></select>
+        ${statsInput(isCricket, saved.rating||'', inputLocked)}
         <span class="pe-flight-badge" style="${initBadgeStyle}">${initBadgeText}</span>
       </div>`;
     }
@@ -240,12 +249,14 @@ function buildGames(skipSave=false){
     else if(r.winner==='my') cls += ' decided-win';
     else if(r.winner==='opp')cls += ' decided-lose';
     if(collapsed)            cls += ' done-collapsed';
+    if(inputLocked && !decided && !isForfeit) cls += ' input-locked';
 
     let badge = '';
     if(isForfeit)            badge = '<span class="game-done-badge f">不戦敗</span>';
     else if(r.winner==='my') badge = '<span class="game-done-badge w">MY WIN</span>';
     else if(r.winner==='opp')badge = '<span class="game-done-badge l">OPP WIN</span>';
 
+    const btnDis = inputLocked ? 'disabled' : '';
     const div = document.createElement('div');
     div.className = cls; div.id = 'gr-'+idx;
     div.dataset.forfeit = isForfeit ? '1' : '0';
@@ -259,9 +270,9 @@ function buildGames(skipSave=false){
       </div>
       <div class="game-players-grid" id="pg-${idx}">${playerRows}</div>
       <div class="win-btns">
-        <button class="win-btn w ${r.winner==='my'?'sel':''}" onclick="event.stopPropagation();setWinner(${idx},'my')">MY WIN ✓</button>
+        <button class="win-btn w ${r.winner==='my'?'sel':''}" onclick="event.stopPropagation();setWinner(${idx},'my')" ${btnDis}>MY WIN ✓</button>
         <div class="vs-mid">VS</div>
-        <button class="win-btn l ${r.winner==='opp'?'sel':''}" onclick="event.stopPropagation();setWinner(${idx},'opp')">OPP WIN ✗</button>
+        <button class="win-btn l ${r.winner==='opp'?'sel':''}" onclick="event.stopPropagation();setWinner(${idx},'opp')" ${btnDis}>OPP WIN ✗</button>
       </div>`;
     wrap.appendChild(div);
   });
@@ -269,6 +280,18 @@ function buildGames(skipSave=false){
 }
 
 function setWinner(idx, who){
+  const oppTeam = document.getElementById('s-opp-team')?.value;
+  if(!oppTeam){
+    toast('⚠️ 対戦相手チームを選択してください');
+    return;
+  }
+  // 前のゲームが未決定なら入力不可
+  for(let i = 0; i < idx; i++){
+    if(gameResults[i].winner === null && !gameResults[i].forfeit){
+      toast(`⚠️ ${i+1}G の勝敗を先に入力してください`);
+      return;
+    }
+  }
   const pg = document.getElementById('pg-'+idx);
   if(pg && who !== null){
     const namesSels   = [...pg.querySelectorAll('.pe-name')];
@@ -450,16 +473,8 @@ function populatePlayerDropdowns(){
       allMembers.forEach(m=>{
         if(!m.name || otherSelected.includes(m.name)) return;
         const isToday = todayMembers.length === 0 || todayMembers.includes(m.name);
-        // 当日不参加メンバーはdisabledで表示（選択不可）
-        if(!isToday){
-          const o = document.createElement('option');
-          o.value = m.name;
-          o.textContent = m.name + '（不参加）';
-          o.disabled = true;
-          o.style.color = 'var(--text2)';
-          sel.appendChild(o);
-          return;
-        }
+        // 当日不参加メンバーは非表示
+        if(!isToday) return;
         const o = document.createElement('option');
         o.value = m.name;
         const cnt = selectCount[m.name] || 0;

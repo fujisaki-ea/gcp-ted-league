@@ -94,9 +94,10 @@ function flightBadge(statsVal, isCricket) {
 }
 
 // スタッツ入力欄HTML（ゼロワン/クリケット対応）
-function statsInput(isCricket, savedVal='') {
+function statsInput(isCricket, savedVal='', disabled=false) {
   const ph = isCricket ? '0.00' : '0.0';
-  return `<input type="text" inputmode="none" class="no-mb pe-rating pe-stats" data-cricket="${isCricket}" placeholder="${ph}" value="${savedVal}" onclick="openNumpad(this)" style="width:70px;padding:8px 6px;text-align:center;font-size:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);">`;
+  const disAttr = disabled ? 'disabled' : '';
+  return `<input type="text" inputmode="none" class="no-mb pe-rating pe-stats" data-cricket="${isCricket}" placeholder="${ph}" value="${savedVal}" onclick="openNumpad(this)" ${disAttr} style="width:70px;padding:8px 6px;text-align:center;font-size:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);">`;
 }
 
 // ─────────────────────────────────────────
@@ -251,15 +252,16 @@ function renderHome(){
   // ── 順位計算 ──
   const standing = D.teams.map(t=>{
     const matches = D.matches.filter(m=>m.teamA===t.name||m.teamB===t.name);
-    let w=0,l=0;
+    let w=0,l=0,lw=0;
     matches.forEach(m=>{
       const isA = m.teamA===t.name;
       const tw = isA ? m.scoreA : m.scoreB;
       const ow = isA ? m.scoreB : m.scoreA;
       if(tw>ow) w++; else l++;
+      lw += tw;
     });
-    return {name:t.name, w, l, total:matches.length};
-  }).sort((a,b)=> b.w-a.w || a.l-b.l);
+    return {name:t.name, w, l, lw, total:matches.length};
+  }).sort((a,b)=> b.w-a.w || b.lw-a.lw);
 
   const rankRows = standing.map((s,i)=>{
     const isMe = s.name===team;
