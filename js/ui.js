@@ -943,6 +943,14 @@ function saveTeamModal(){
         if(Object.keys(upd).length && n._fbKey && window.fbUpdateNotif)
           window.fbUpdateNotif(n._fbKey, upd);
       });
+      // schedule のチーム名を更新
+      let scheduleChanged = false;
+      (D.schedule||[]).forEach(s=>{
+        if(s.teamA===oldName){ s.teamA=name; scheduleChanged=true; }
+        if(s.teamB===oldName){ s.teamB=name; scheduleChanged=true; }
+      });
+      if(scheduleChanged && window.fbSaveScheduleExtras)
+        window.fbSaveScheduleExtras(D.schedule);
       // パスワードキーを付け替え
       if(window.fbRenamePasswordKey) window.fbRenamePasswordKey(oldName, name);
       toast(`「${oldName}」→「${name}」に変更しました`);
