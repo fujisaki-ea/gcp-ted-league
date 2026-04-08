@@ -404,10 +404,6 @@ function populatePlayerDropdowns(){
   const myName = document.getElementById('s-my-team').value;
   const team   = D.teams.find(t=>t.name===myName);
   const allMembers = team ? (team.players||[]) : [];
-  // 当日参加メンバーのみに絞り込む（未選択の場合は全員）
-  const members = todayMembers.length > 0
-    ? allMembers.filter(m=>todayMembers.includes(m.name))
-    : allMembers;
 
   const singlesIndices = GAMES.map((gd,i)=>gd.n===1?i:-1).filter(i=>i>=0);
 
@@ -446,8 +442,19 @@ function populatePlayerDropdowns(){
       const singlesUsed = isSingles ? getSinglesSelected(idx) : new Set();
 
       sel.innerHTML = '<option value="">— 選手 —</option>';
-      members.forEach(m=>{
+      allMembers.forEach(m=>{
         if(!m.name || otherSelected.includes(m.name)) return;
+        const isToday = todayMembers.length === 0 || todayMembers.includes(m.name);
+        // 当日不参加メンバーはdisabledで表示（選択不可）
+        if(!isToday){
+          const o = document.createElement('option');
+          o.value = m.name;
+          o.textContent = m.name + '（不参加）';
+          o.disabled = true;
+          o.style.color = 'var(--text2)';
+          sel.appendChild(o);
+          return;
+        }
         const o = document.createElement('option');
         o.value = m.name;
         const cnt = selectCount[m.name] || 0;
@@ -463,7 +470,11 @@ function populatePlayerDropdowns(){
       });
       const saved = (gameResults[idx]?.players||[])[si]?.name || '';
       const restoreVal = cur || saved;
-      if(members.find(m=>m.name===restoreVal)) sel.value=restoreVal;
+      // 当日メンバーの場合のみ値を復元
+      const isRestoreOk = todayMembers.length === 0
+        ? allMembers.some(m=>m.name===restoreVal)
+        : todayMembers.includes(restoreVal);
+      if(isRestoreOk) sel.value=restoreVal;
     });
   });
 }
