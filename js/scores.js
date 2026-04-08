@@ -723,9 +723,36 @@ const _autoApprovingIds = new Set();
 async function autoApprovePending(pending){
   if(_autoApprovingIds.has(pending.id)) return;
   _autoApprovingIds.add(pending.id);
+
+  // Firebase上でatomicにclaimする（複数クライアントが同時に承認するのを防ぐ）
+  if(window.fbClaimPendingApproval){
+    const claimed = await window.fbClaimPendingApproval(pending._fbKey);
+    if(!claimed){
+      // 別クライアントが先にclaimした → 自分は何もしない
+      _autoApprovingIds.delete(pending.id);
+      return;
+    }
+  }
+
   if(!D.pendingMatches) D.pendingMatches = [];
   const sx = pending.submissionX;
   const sy = pending.submissionY;
+
+  // 二重登録防止: 同じカードが既にmatchesに存在する場合はpendingだけ削除して終了
+  const alreadyExists = (D.matches||[]).some(m=>
+    m.date === pending.date &&
+    ((m.teamA===pending.teamX && m.teamB===pending.teamY) ||
+     (m.teamA===pending.teamY && m.teamB===pending.teamX))
+  );
+  if(alreadyExists){
+    if(window.fbRemovePending && pending._fbKey){
+      try{ await window.fbRemovePending(pending._fbKey); }catch(e){}
+    }
+    D.pendingMatches = D.pendingMatches.filter(p=>p.id!==pending.id);
+    pending.status = 'approved';
+    _autoApprovingIds.delete(pending.id);
+    return;
+  }
 
   let mergedGames = sx.games || [];
   if(sy && sy.games && sy.games.length){

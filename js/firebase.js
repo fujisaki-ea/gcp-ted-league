@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, update, push, remove, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, update, push, remove, onValue, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -121,6 +121,24 @@ window.fbPushNotif = async function(record) {
   const r = await push(notifsRef, clean);
   return r.key;
 };
+// pendingMatchをatomicにclaimする（複数クライアントの二重承認防止）
+// status が 'pending' のときだけ 'approving' にCAS。成功した1クライアントだけtrueを返す。
+window.fbClaimPendingApproval = async function(fbKey) {
+  if(!fbKey) return true; // fbKeyなし（オフライン等）は通過させる
+  try {
+    const pendRef = ref(db, 'gcpLeague/pendingMatches/' + fbKey);
+    const result = await runTransaction(pendRef, (current) => {
+      if(current === null) return; // 既に削除済み → abort
+      if(current.status === 'approving' || current.status === 'approved') return; // 他クライアントが先行 → abort
+      return { ...current, status: 'approving' };
+    });
+    return result.committed;
+  } catch(e) {
+    console.error('fbClaimPendingApproval error:', e);
+    return false;
+  }
+};
+
 window.fbRemoveNotif = function(fbKey) {
   return remove(ref(db, 'gcpLeague/rejectedNotifs/' + fbKey));
 };
