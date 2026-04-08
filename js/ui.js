@@ -186,11 +186,15 @@ function applyFirebaseData(data) {
   if(data.matches) D.matches = toArray(data.matches, true);
   if(data.schedule) {
     const sched = toArray(data.schedule);
-    // Firebase上に保存されたデフォルトIDのアイテム（チーム名変更等で上書きされたもの）を優先
-    const fbOverrides2026 = sched.filter(s=>s.season==='2026' && DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
-    const extra2026       = sched.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
-    const base2026        = DEFAULT_SCHEDULE_2026.filter(d=>!fbOverrides2026.some(o=>o.id===d.id));
-    D.schedule = [...sched.filter(s=>s.season!=='2026'), ...base2026, ...fbOverrides2026, ...extra2026];
+    // FirebaseにDEFAULT全件が保存されている（チーム名変更後など）→ Firebase版を全面使用
+    const hasAllDefaults = DEFAULT_SCHEDULE_2026.every(d => sched.some(s => String(s.id) === String(d.id)));
+    if(hasAllDefaults) {
+      D.schedule = sched;
+    } else {
+      // 通常: デフォルト外のextraのみFirebaseから取得、DEFAULT_SCHEDULE_2026とマージ
+      const extra2026 = sched.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>String(d.id)===String(s.id)));
+      D.schedule = [...sched.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026, ...extra2026];
+    }
   }
   D.pendingMatches = toArray(data.pendingMatches, true);
   D.rejectedNotifs = toArray(data.rejectedNotifs, true);
@@ -946,13 +950,7 @@ function saveTeamModal(){
         if(Object.keys(upd).length && n._fbKey && window.fbUpdateNotif)
           window.fbUpdateNotif(n._fbKey, upd);
       });
-      // DEFAULT_SCHEDULE_2026 を直接書き換え（onValueが何度呼ばれても新名前が基準になる）
-      DEFAULT_SCHEDULE_2026.forEach(d=>{
-        if(d.teamA===oldName) d.teamA = name;
-        if(d.teamB===oldName) d.teamB = name;
-        if(d.home===oldName)  d.home  = name;
-      });
-      // D.schedule も同期（既存アイテムを新名前のコピーに置換）
+      // D.schedule を先にコピーして更新（DEFAULT参照より前に処理する）
       D.schedule = (D.schedule||[]).map(s=>{
         const upd = {};
         if(s.teamA===oldName){ upd.teamA=name; }
@@ -960,7 +958,13 @@ function saveTeamModal(){
         if(s.home===oldName) { upd.home=name;  }
         return Object.keys(upd).length ? {...s, ...upd} : s;
       });
-      // Firebase にも保存（ページ再読込後の永続化用）
+      // DEFAULT_SCHEDULE_2026 も書き換え（onValueで上書きされても新名前が基準になる）
+      DEFAULT_SCHEDULE_2026.forEach(d=>{
+        if(d.teamA===oldName) d.teamA = name;
+        if(d.teamB===oldName) d.teamB = name;
+        if(d.home===oldName)  d.home  = name;
+      });
+      // Firebase に全件保存（ページ再読込後の永続化用）
       if(window.fbSaveScheduleExtras) window.fbSaveScheduleExtras(D.schedule);
       // パスワードキーを付け替え
       if(window.fbRenamePasswordKey) window.fbRenamePasswordKey(oldName, name);
