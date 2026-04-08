@@ -186,8 +186,11 @@ function applyFirebaseData(data) {
   if(data.matches) D.matches = toArray(data.matches, true);
   if(data.schedule) {
     const sched = toArray(data.schedule);
-    const extra2026 = sched.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
-    D.schedule = [...sched.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026, ...extra2026];
+    // Firebase上に保存されたデフォルトIDのアイテム（チーム名変更等で上書きされたもの）を優先
+    const fbOverrides2026 = sched.filter(s=>s.season==='2026' && DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
+    const extra2026       = sched.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
+    const base2026        = DEFAULT_SCHEDULE_2026.filter(d=>!fbOverrides2026.some(o=>o.id===d.id));
+    D.schedule = [...sched.filter(s=>s.season!=='2026'), ...base2026, ...fbOverrides2026, ...extra2026];
   }
   D.pendingMatches = toArray(data.pendingMatches, true);
   D.rejectedNotifs = toArray(data.rejectedNotifs, true);
