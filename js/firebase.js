@@ -108,6 +108,9 @@ window.fbPushMatch = async function(record) {
   fbAutoBackup(true); // 試合追加後に強制バックアップ
   return r.key;
 };
+window.fbUpdateMatch = function(fbKey, data) {
+  return update(ref(db, 'gcpLeague/matches/' + fbKey), data);
+};
 window.fbRemoveMatch = function(fbKey) {
   return remove(ref(db, 'gcpLeague/matches/' + fbKey));
 };
@@ -139,6 +142,9 @@ window.fbClaimPendingApproval = async function(fbKey) {
   }
 };
 
+window.fbUpdateNotif = function(fbKey, data) {
+  return update(ref(db, 'gcpLeague/rejectedNotifs/' + fbKey), data);
+};
 window.fbRemoveNotif = function(fbKey) {
   return remove(ref(db, 'gcpLeague/rejectedNotifs/' + fbKey));
 };
@@ -184,6 +190,22 @@ onValue(dataRef, (snapshot) => {
   if(divs[2]) divs[2].textContent = 'サーバーに接続できませんでした';
   if(retryBtn) retryBtn.style.display = 'inline-block';
 });
+
+// チーム名変更時にパスワードキーを付け替える（ハッシュはそのまま移行）
+window.fbRenamePasswordKey = async function(oldTeam, newTeam) {
+  try {
+    const snapshot = await get(pwRef);
+    if(!snapshot.exists()) return;
+    const passwords = snapshot.val();
+    if(!passwords[oldTeam]) return;
+    const hash = passwords[oldTeam];
+    delete passwords[oldTeam];
+    passwords[newTeam] = hash;
+    await set(pwRef, passwords);
+  } catch(e) {
+    console.error('fbRenamePasswordKey error:', e);
+  }
+};
 
 // パスワードをSHA-256でハッシュ化
 async function hashPassword(password) {

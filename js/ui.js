@@ -707,7 +707,7 @@ function renderTeams(){
           ${(currentUser && (currentUser.isAdmin || (currentUser.team===t.name))) ? `
           <button class="edit-btn" onclick="addPlayerInline(${i})">＋ 追加</button>
           <button class="edit-btn" style="${editStyle}" onclick="toggleDeleteMode(${i})">${editLabel}</button>
-          ${currentUser.isAdmin ? `<button class="edit-btn" style="border-color:var(--lose);color:var(--lose);" onclick="deleteTeam(${i})">🗑️</button>` : ''}
+          ${currentUser.isAdmin ? `<button class="edit-btn" onclick="openEditTeamModal(${i})">✏️ 名前</button><button class="edit-btn" style="border-color:var(--lose);color:var(--lose);" onclick="deleteTeam(${i})">🗑️</button>` : ''}
         ` : ''}
         </div>
       </div>
@@ -915,7 +915,40 @@ function saveTeamModal(){
       toast(`${name} を追加しました（初期パスワード: 123456）`);
     }
   } else {
-    D.teams[editingTeamIdx]={name,players}; toast(`${name} を更新しました`);
+    const oldName = D.teams[editingTeamIdx].name;
+    D.teams[editingTeamIdx] = {name, players};
+    if(oldName !== name){
+      // matches のチーム名を更新
+      (D.matches||[]).forEach(m=>{
+        const upd={};
+        if(m.teamA===oldName){ m.teamA=name; upd.teamA=name; }
+        if(m.teamB===oldName){ m.teamB=name; upd.teamB=name; }
+        if(Object.keys(upd).length && m._fbKey && window.fbUpdateMatch)
+          window.fbUpdateMatch(m._fbKey, upd);
+      });
+      // pendingMatches のチーム名を更新
+      (D.pendingMatches||[]).forEach(p=>{
+        const upd={};
+        if(p.teamX===oldName){ p.teamX=name; upd.teamX=name; }
+        if(p.teamY===oldName){ p.teamY=name; upd.teamY=name; }
+        if(Object.keys(upd).length && p._fbKey && window.fbUpdatePending)
+          window.fbUpdatePending(p._fbKey, upd);
+      });
+      // rejectedNotifs のチーム名を更新
+      (D.rejectedNotifs||[]).forEach(n=>{
+        const upd={};
+        if(n.teamX===oldName){ n.teamX=name; upd.teamX=name; }
+        if(n.teamY===oldName){ n.teamY=name; upd.teamY=name; }
+        if(n.forTeam===oldName){ n.forTeam=name; upd.forTeam=name; }
+        if(Object.keys(upd).length && n._fbKey && window.fbUpdateNotif)
+          window.fbUpdateNotif(n._fbKey, upd);
+      });
+      // パスワードキーを付け替え
+      if(window.fbRenamePasswordKey) window.fbRenamePasswordKey(oldName, name);
+      toast(`「${oldName}」→「${name}」に変更しました`);
+    } else {
+      toast(`${name} を更新しました`);
+    }
   }
   inlineEditing = null;
   deleteModeTeamIdx = null;
