@@ -161,6 +161,8 @@ const DEFAULT_SCHEDULE_2026 = [
   {id:20260030, season:'2026', date:'2026-09-23', teamA:'デイリー',    teamB:'¥500バーグ食堂', home:'デイリー',  venue:'GCP',         note:'第24試合'},
   {id:20260031, season:'2026', date:'2026-09-30', teamA:'', teamB:'', home:'', venue:'GCP',         note:'🏆 決勝戦'},
 ];
+// ORIGINAL は変更不可（チーム名変更時の基準として常に使う）
+const ORIGINAL_SCHEDULE_2026 = DEFAULT_SCHEDULE_2026.map(d=>({...d}));
 
 function load(){
   try{
@@ -168,8 +170,10 @@ function load(){
     if(s) D=JSON.parse(s);
   }catch(e){}
   if(!D.schedule) D.schedule = [];
-  const extra2026 = D.schedule.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>d.id===s.id));
-  D.schedule = [...D.schedule.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026, ...extra2026];
+  const _r0 = D.teamRenames || {};
+  const _apR0 = s => { const tA=_r0[s.teamA]||s.teamA,tB=_r0[s.teamB]||s.teamB,h=_r0[s.home]||s.home; return (tA!==s.teamA||tB!==s.teamB||h!==s.home)?{...s,teamA:tA,teamB:tB,home:h}:s; };
+  const extra2026 = D.schedule.filter(s=>s.season==='2026' && !ORIGINAL_SCHEDULE_2026.some(d=>d.id===s.id));
+  D.schedule = [...D.schedule.filter(s=>s.season!=='2026'), ...ORIGINAL_SCHEDULE_2026.map(_apR0), ...extra2026.map(_apR0)];
   if(!D.pendingMatches) D.pendingMatches = [];
   if(!D.rejectedNotifs) D.rejectedNotifs = [];
 }
@@ -184,18 +188,12 @@ function applyFirebaseData(data) {
   if(!data) return;
   if(data.teams)   D.teams   = toArray(data.teams).map(t => ({...t, players: toArray(t.players)}));
   if(data.matches) D.matches = toArray(data.matches, true);
-  if(data.schedule) {
-    const sched = toArray(data.schedule);
-    // FirebaseにDEFAULT全件が保存されている（チーム名変更後など）→ Firebase版を全面使用
-    const hasAllDefaults = DEFAULT_SCHEDULE_2026.every(d => sched.some(s => String(s.id) === String(d.id)));
-    if(hasAllDefaults) {
-      D.schedule = sched;
-    } else {
-      // 通常: デフォルト外のextraのみFirebaseから取得、DEFAULT_SCHEDULE_2026とマージ
-      const extra2026 = sched.filter(s=>s.season==='2026' && !DEFAULT_SCHEDULE_2026.some(d=>String(d.id)===String(s.id)));
-      D.schedule = [...sched.filter(s=>s.season!=='2026'), ...DEFAULT_SCHEDULE_2026, ...extra2026];
-    }
-  }
+  if(data.teamRenames !== undefined) D.teamRenames = data.teamRenames || {};
+  const _rn = D.teamRenames || {};
+  const _apRn = s => { const tA=_rn[s.teamA]||s.teamA,tB=_rn[s.teamB]||s.teamB,h=_rn[s.home]||s.home; return (tA!==s.teamA||tB!==s.teamB||h!==s.home)?{...s,teamA:tA,teamB:tB,home:h}:s; };
+  const sched = data.schedule ? toArray(data.schedule) : [];
+  const extra2026 = sched.filter(s=>s.season==='2026' && !ORIGINAL_SCHEDULE_2026.some(d=>String(d.id)===String(s.id)));
+  D.schedule = [...sched.filter(s=>s.season!=='2026'), ...ORIGINAL_SCHEDULE_2026.map(_apRn), ...extra2026.map(_apRn)];
   D.pendingMatches = toArray(data.pendingMatches, true);
   D.rejectedNotifs = toArray(data.rejectedNotifs, true);
   try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
@@ -950,22 +948,24 @@ function saveTeamModal(){
         if(Object.keys(upd).length && n._fbKey && window.fbUpdateNotif)
           window.fbUpdateNotif(n._fbKey, upd);
       });
-      // D.schedule を先にコピーして更新（DEFAULT参照より前に処理する）
-      D.schedule = (D.schedule||[]).map(s=>{
-        const upd = {};
-        if(s.teamA===oldName){ upd.teamA=name; }
-        if(s.teamB===oldName){ upd.teamB=name; }
-        if(s.home===oldName) { upd.home=name;  }
-        return Object.keys(upd).length ? {...s, ...upd} : s;
+      // teamRenames マップを更新して Firebase に保存（小さいデータ、レース条件なし）
+      if(!D.teamRenames) D.teamRenames = {};
+      // 連鎖リネーム対応: 既存エントリで oldName が値になっているものを更新
+      Object.keys(D.teamRenames).forEach(orig => {
+        if(D.teamRenames[orig] === oldName) D.teamRenames[orig] = name;
       });
-      // DEFAULT_SCHEDULE_2026 も書き換え（onValueで上書きされても新名前が基準になる）
-      DEFAULT_SCHEDULE_2026.forEach(d=>{
-        if(d.teamA===oldName) d.teamA = name;
-        if(d.teamB===oldName) d.teamB = name;
-        if(d.home===oldName)  d.home  = name;
-      });
-      // Firebase に全件保存（ページ再読込後の永続化用）
-      if(window.fbSaveScheduleExtras) window.fbSaveScheduleExtras(D.schedule);
+      // ORIGINAL に oldName が含まれていれば直接マッピングを追加
+      if(ORIGINAL_SCHEDULE_2026.some(d=>d.teamA===oldName||d.teamB===oldName||d.home===oldName)){
+        D.teamRenames[oldName] = name;
+      }
+      // 自己マッピング除去（A→A は不要）
+      Object.keys(D.teamRenames).forEach(k=>{ if(D.teamRenames[k]===k) delete D.teamRenames[k]; });
+      if(window.fbSaveTeamRenames) window.fbSaveTeamRenames(D.teamRenames);
+      // D.schedule を ORIGINAL + teamRenames で再構築
+      const _rSave = D.teamRenames;
+      const _apRSave = s => { const tA=_rSave[s.teamA]||s.teamA,tB=_rSave[s.teamB]||s.teamB,h=_rSave[s.home]||s.home; return (tA!==s.teamA||tB!==s.teamB||h!==s.home)?{...s,teamA:tA,teamB:tB,home:h}:s; };
+      const _extras = (D.schedule||[]).filter(s=>!ORIGINAL_SCHEDULE_2026.some(d=>String(d.id)===String(s.id)));
+      D.schedule = [...ORIGINAL_SCHEDULE_2026.map(_apRSave), ..._extras.map(_apRSave)];
       // パスワードキーを付け替え
       if(window.fbRenamePasswordKey) window.fbRenamePasswordKey(oldName, name);
       toast(`「${oldName}」→「${name}」に変更しました`);

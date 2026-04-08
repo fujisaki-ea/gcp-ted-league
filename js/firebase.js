@@ -91,6 +91,14 @@ window.fbAutoBackup = async function(force = false) {
   }
 };
 
+// teamRenames: チーム名変更マップを保存（例: {ハッチ: サカエ}）
+window.fbSaveTeamRenames = function(renames) {
+  if(!renames || Object.keys(renames).length === 0) {
+    return set(ref(db, 'gcpLeague/teamRenames'), null);
+  }
+  return set(ref(db, 'gcpLeague/teamRenames'), renames);
+};
+
 // schedule extras: デフォルト以外の日程を保存
 window.fbSaveScheduleExtras = function(items) {
   if(!items || !items.length) {
