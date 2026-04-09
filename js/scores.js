@@ -225,9 +225,11 @@ function buildGames(skipSave=false){
     const isForfeit = !!r.forfeit;
     const collapsed = decided && !collapseOpen[idx];
 
-    // 前ゲームに未決定があれば入力不可
+    // 選手入力：チーム・当日メンバーが揃えば全ゲーム入力可
+    const playerLocked = !teamsReady;
+    // WINボタン：前ゲームの勝敗が入力済みでないと押せない
     const prevPending = !isForfeit && gameResults.slice(0, idx).some(pr => pr.winner === null && !pr.forfeit);
-    const inputLocked = !teamsReady || prevPending;
+    const btnLocked = !teamsReady || prevPending;
 
     const isCricket = gd.label.includes('クリケット');
     let playerRows = '';
@@ -236,10 +238,10 @@ function buildGames(skipSave=false){
       const initFlight = getFlight(saved.rating||'', isCricket);
       const initBadgeStyle = initFlight ? `background:${initFlight.bg};color:${initFlight.color};` : 'background:transparent;';
       const initBadgeText = initFlight ? initFlight.label : '';
-      const disAttr = inputLocked ? 'disabled' : '';
+      const disAttr = playerLocked ? 'disabled' : '';
       playerRows += `<div class="player-entry" style="grid-template-columns:1fr 70px 44px;">
         <select class="no-mb pe-name" onchange="onPlayerChange(${idx})" ${disAttr}><option value="">— 選手 ${p+1} —</option></select>
-        ${statsInput(isCricket, saved.rating||'', inputLocked)}
+        ${statsInput(isCricket, saved.rating||'', playerLocked)}
         <span class="pe-flight-badge" style="${initBadgeStyle}">${initBadgeText}</span>
       </div>`;
     }
@@ -249,14 +251,14 @@ function buildGames(skipSave=false){
     else if(r.winner==='my') cls += ' decided-win';
     else if(r.winner==='opp')cls += ' decided-lose';
     if(collapsed)            cls += ' done-collapsed';
-    if(inputLocked && !decided && !isForfeit) cls += ' input-locked';
+    if(playerLocked && !decided && !isForfeit) cls += ' input-locked';
 
     let badge = '';
     if(isForfeit)            badge = '<span class="game-done-badge f">不戦敗</span>';
     else if(r.winner==='my') badge = '<span class="game-done-badge w">MY WIN</span>';
     else if(r.winner==='opp')badge = '<span class="game-done-badge l">OPP WIN</span>';
 
-    const btnDis = inputLocked ? 'disabled' : '';
+    const btnDis = btnLocked ? 'disabled' : '';
     const div = document.createElement('div');
     div.className = cls; div.id = 'gr-'+idx;
     div.dataset.forfeit = isForfeit ? '1' : '0';
