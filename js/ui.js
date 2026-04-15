@@ -275,26 +275,41 @@ function renderHome(){
 
   // ── 次の試合 ──
   const todayStr2 = todayStr();
-  const upcomingAll = (D.schedule||[])
-    .filter(s=> s.date >= todayStr2 && s.teamA && s.teamB)
-    .sort((a,b)=>a.date.localeCompare(b.date));
-  const nearestDate = upcomingAll.length ? upcomingAll[0].date : null;
-  const nearestMatches = nearestDate ? upcomingAll.filter(s=>s.date===nearestDate) : [];
-  const nearestDateStr = nearestDate ? new Date(nearestDate).toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'}) : null;
+  const allScheduled = (D.schedule||[]).filter(s=> s.teamA && s.teamB).sort((a,b)=>a.date.localeCompare(b.date));
+  const todayMatches = allScheduled.filter(s=> s.date === todayStr2);
+  const futureMatches = allScheduled.filter(s=> s.date > todayStr2);
+  const nextDate = futureMatches.length ? futureMatches[0].date : null;
+  const nextMatches = nextDate ? futureMatches.filter(s=>s.date===nextDate) : [];
+  const nextDateStr = nextDate ? new Date(nextDate).toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'}) : null;
 
-  const nextHtml = nearestMatches.length
+  function matchListHtml(matches, highlightTeam) {
+    return matches.map(s=>{
+      const isMe = highlightTeam && (s.teamA===highlightTeam||s.teamB===highlightTeam);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);${isMe?'font-weight:700;color:var(--accent);':''}">
+        <span style="font-size:13px;">${s.teamA}</span>
+        <span style="font-size:11px;color:var(--text2);">VS</span>
+        <span style="font-size:13px;">${s.teamB}</span>
+        ${s.venue?`<span style="font-size:11px;color:var(--text2);margin-left:auto;">📍${s.venue}</span>`:''}
+      </div>`;
+    }).join('');
+  }
+
+  const todaySection = todayMatches.length
     ? `<div style="padding:8px 0;">
-        <div style="font-size:16px;font-weight:900;color:var(--accent);margin-bottom:8px;">📅 ${nearestDateStr}</div>
-        ${nearestMatches.map(s=>{
-          const isMe = team && (s.teamA===team||s.teamB===team);
-          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);${isMe?'font-weight:700;color:var(--accent);':''}">
-            <span style="font-size:13px;">${s.teamA}</span>
-            <span style="font-size:11px;color:var(--text2);">VS</span>
-            <span style="font-size:13px;">${s.teamB}</span>
-            ${s.venue?`<span style="font-size:11px;color:var(--text2);margin-left:auto;">📍${s.venue}</span>`:''}
-          </div>`;
-        }).join('')}
+        <div style="font-size:16px;font-weight:900;color:var(--accent);margin-bottom:8px;">📅 本日の試合</div>
+        ${matchListHtml(todayMatches, team)}
+      </div>` : '';
+
+  const nextSection = nextMatches.length
+    ? `<div style="padding:8px 0;${todayMatches.length?'margin-top:8px;border-top:1px solid var(--border);':''}">
+        <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:6px;">次回開催</div>
+        <div style="font-size:15px;font-weight:900;color:var(--accent);margin-bottom:8px;">📅 ${nextDateStr}</div>
+        ${matchListHtml(nextMatches, team)}
       </div>`
+    : (todayMatches.length ? `<div style="padding:8px 0;margin-top:8px;border-top:1px solid var(--border);color:var(--text2);font-size:13px;">次回開催は未定です</div>` : '');
+
+  const nextHtml = (todaySection || nextSection)
+    ? todaySection + nextSection
     : `<div style="padding:12px 0;color:var(--text2);font-size:13px;">次の試合は未定です</div>`;
 
   // ── 最新の試合結果 ──
