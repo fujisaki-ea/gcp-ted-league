@@ -589,7 +589,7 @@ function renderHistory(){
   }
   const sorted = [...D.matches].sort((a,b)=>b.id-a.id);
   const matchesHtml = sorted.length ? sorted.map(m=>{
-    const won = m.scoreA > m.scoreB;
+    const winner = m.scoreA > m.scoreB ? m.teamA : m.teamB;
     const detailRows = (m.games||[]).filter(g=>g.winner).map(g=>{
       const isCr = (g.label||"").includes("クリケット");
       const chips = (g.players||[]).map(p=>{
@@ -614,8 +614,8 @@ function renderHistory(){
           <div class="hist-teams">${m.teamA} <span style="color:var(--text2);font-weight:400">vs</span> ${m.teamB}</div>
         </div>
         <div style="text-align:right">
-          <div class="hist-score ${won?'w':'l'}">${m.scoreA} - ${m.scoreB}</div>
-          <div><span class="hist-badge ${won?'w':'l'}">${won?'WIN':'LOSE'}</span></div>
+          <div class="hist-score w">${m.scoreA} - ${m.scoreB}</div>
+          <div><span class="hist-badge w">${winner} 勝利</span></div>
         </div>
       </div>
       <div class="detail-panel" id="dp-${m.id}">
