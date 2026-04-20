@@ -80,7 +80,7 @@ window.fbAutoBackup = async function(force = false) {
     const allSnap = await get(backupsRef);
     if(allSnap.exists()) {
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 7);
+      cutoff.setDate(cutoff.getDate() - 180);
       const cutoffKey = `${cutoff.getFullYear()}${String(cutoff.getMonth()+1).padStart(2,'0')}${String(cutoff.getDate()).padStart(2,'0')}`;
       for(const k of Object.keys(allSnap.val())) {
         if(k < cutoffKey) await remove(ref(db, `backups/${k}`));
