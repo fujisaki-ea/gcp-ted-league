@@ -592,6 +592,8 @@ function renderHistory(){
     const winner = m.scoreA > m.scoreB ? m.teamA : m.teamB;
     const detailRows = (m.games||[]).filter(g=>g.winner).map(g=>{
       const isCr = (g.label||"").includes("クリケット");
+      const winTeam  = g.winner==='my' ? m.teamA : m.teamB;
+      const loseTeam = g.winner==='my' ? m.teamB : m.teamA;
       const chips = (g.players||[]).map(p=>{
         const rPart = p.rating
           ? `${flightBadge(p.rating, isCr)}<span class="chip-rating">${p.rating}</span>`
@@ -602,7 +604,7 @@ function renderHistory(){
         <div class="detail-game-top">
           <span class="detail-gnum">${g.game}G</span>
           <span class="detail-gtype">${g.label}</span>
-          <span class="detail-result ${g.winner==='my'?'w':'l'}">${g.winner==='my'?'WIN':'LOSE'}</span>
+          <span class="detail-result"><span class="dr-win">${winTeam} WIN</span><span class="dr-sep">·</span><span class="dr-lose">${loseTeam} LOSE</span></span>
         </div>
         <div class="player-chips">${chips||'<span style="color:var(--text2);font-size:11px;">選手未入力</span>'}</div>
       </div>`;
