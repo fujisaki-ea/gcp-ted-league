@@ -225,9 +225,9 @@ input.no-mb,select.no-mb{margin-bottom:0;}
 .detail-gnum{font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--accent);}
 .detail-gtype{color:var(--text2);font-size:10px;flex:1;}
 .detail-result{font-size:11px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
-.detail-result .dr-win{color:var(--text2);font-weight:600;}
+.detail-result .dr-win{color:#fff;background:var(--win);font-weight:700;padding:2px 8px;border-radius:999px;}
 .detail-result .dr-sep{color:var(--border);}
-.detail-result .dr-lose{color:#fff;background:var(--lose);font-weight:700;padding:2px 8px;border-radius:999px;}
+.detail-result .dr-lose{color:var(--text2);font-weight:600;}
 .player-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;}
 .player-chip{display:inline-flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;}
 .chip-name{color:var(--text);}
