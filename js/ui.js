@@ -1,4 +1,19 @@
 // ─────────────────────────────────────────
+//  SECURITY: HTMLエスケープ（XSS対策）
+//  チーム名・選手名などユーザー入力をinnerHTMLに出す際は必ず esc() を通す
+// ─────────────────────────────────────────
+function esc(v){
+  if(v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+window.esc = esc;
+
+// ─────────────────────────────────────────
 //  CONSTANTS
 // ─────────────────────────────────────────
 const GAMES = [
@@ -268,7 +283,7 @@ function renderHome(){
     return `<div style="display:grid;grid-template-columns:28px 1fr auto;align-items:center;padding:8px 0;
       border-bottom:1px solid var(--border);${isMe?'font-weight:700;color:var(--accent);':''}">
       <span style="font-size:13px;">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1+'位'}</span>
-      <span style="font-size:14px;">${s.name}</span>
+      <span style="font-size:14px;">${esc(s.name)}</span>
       <span style="font-size:13px;color:var(--text2);">${s.w}勝${s.l}敗</span>
     </div>`;
   }).join('');
@@ -286,10 +301,10 @@ function renderHome(){
     return matches.map(s=>{
       const isMe = highlightTeam && (s.teamA===highlightTeam||s.teamB===highlightTeam);
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);${isMe?'font-weight:700;color:var(--accent);':''}">
-        <span style="font-size:13px;">${s.teamA}</span>
+        <span style="font-size:13px;">${esc(s.teamA)}</span>
         <span style="font-size:11px;color:var(--text2);">VS</span>
-        <span style="font-size:13px;">${s.teamB}</span>
-        ${s.venue?`<span style="font-size:11px;color:var(--text2);margin-left:auto;">📍${s.venue}</span>`:''}
+        <span style="font-size:13px;">${esc(s.teamB)}</span>
+        ${s.venue?`<span style="font-size:11px;color:var(--text2);margin-left:auto;">📍${esc(s.venue)}</span>`:''}
       </div>`;
     }).join('');
   }
@@ -333,7 +348,7 @@ function renderHome(){
       return `<div style="display:grid;grid-template-columns:80px 1fr auto;align-items:center;
         padding:8px 0;border-bottom:1px solid var(--border);">
         <span style="font-size:12px;color:var(--text2);">${dStr}</span>
-        <span style="font-size:13px;">vs ${oppName}</span>
+        <span style="font-size:13px;">vs ${esc(oppName)}</span>
         <span style="font-size:13px;font-weight:700;color:${win?'var(--win)':'var(--lose)'};">
           ${myW}-${opW} ${win?'●WIN':'●LOSE'}
         </span>
@@ -405,7 +420,7 @@ function renderHome(){
       const sub   = isConflict ? `<div style="font-size:11px;color:var(--text2);margin-top:3px;">スコアを確認し、スコア入力画面から修正して再申請してください。</div>` : '';
       return `<div style="background:${bg};border:1px solid ${bd};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="font-size:12px;font-weight:700;color:${color};">${title}</div>
-        <div style="font-size:12px;margin-top:4px;">${n.date}　${n.teamX} vs ${n.teamY}</div>
+        <div style="font-size:12px;margin-top:4px;">${esc(n.date)}　${esc(n.teamX)} vs ${esc(n.teamY)}</div>
         ${sub}
         <button onclick="dismissRejectedNotif(${n.id})" style="margin-top:8px;padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">確認しました</button>
       </div>`;
@@ -431,9 +446,9 @@ function renderHome(){
         const btnStyle = 'margin-top:8px;padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;font-weight:700;';
         if(isAdmin){
           statusHtml = `<div style="color:var(--lose);font-size:12px;font-weight:700;margin-top:6px;">⚠️ スコアが一致しません</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px;">${p.teamX}申請: ${sx.scoreX}-${sx.scoreY}　${p.teamY}申請: ${sy.scoreX}-${sy.scoreY}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px;">${esc(p.teamX)}申請: ${sx.scoreX}-${sx.scoreY}　${esc(p.teamY)}申請: ${sy.scoreX}-${sy.scoreY}</div>
           <div style="display:flex;gap:6px;margin-top:8px;">
-            <button onclick="forceApprovePending(${p.id})" style="padding:7px 12px;background:var(--win);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:700;">✅ ${p.teamX}の申請で承認</button>
+            <button onclick="forceApprovePending(${p.id})" style="padding:7px 12px;background:var(--win);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:700;">✅ ${esc(p.teamX)}の申請で承認</button>
             <button onclick="rejectPending(${p.id})" style="padding:7px 12px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 却下</button>
           </div>`;
         } else if(isMySubmission){
@@ -452,12 +467,12 @@ function renderHome(){
         statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:6px;">申請スコア: ${sx.scoreX} - ${sx.scoreY}${expStr?'<br>自動承認: '+expStr:''}</div>
           <button onclick="cancelPending(${p.id})" style="margin-top:8px;padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">取り消す</button>`;
       } else if(isOppSubmission && !sy){
-        statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:6px;">⏳ あなたのスコア送信待ちです<br>${p.teamX}申請スコア: ${sx.scoreX} - ${sx.scoreY}</div>`;
+        statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:6px;">⏳ あなたのスコア送信待ちです<br>${esc(p.teamX)}申請スコア: ${sx.scoreX} - ${sx.scoreY}</div>`;
       } else if(isAdmin && !sy){
         const subAt = sx.submittedAt ? new Date(sx.submittedAt) : null;
         const expAt = subAt ? new Date(subAt.getTime()+72*60*60*1000) : null;
         const expStr = expAt ? expAt.toLocaleDateString('ja-JP',{month:'long',day:'numeric',hour:'numeric',minute:'numeric'}) : '';
-        statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:4px;">${p.teamX}申請: ${sx.scoreX}-${sx.scoreY}${expStr?'　自動承認: '+expStr:''}</div>
+        statusHtml = `<div style="font-size:11px;color:var(--text2);margin-top:4px;">${esc(p.teamX)}申請: ${sx.scoreX}-${sx.scoreY}${expStr?'　自動承認: '+expStr:''}</div>
           <div style="display:flex;gap:6px;margin-top:8px;">
             <button onclick="forceApprovePending(${p.id})" style="padding:7px 12px;background:var(--win);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:700;">✅ 強制承認</button>
             <button onclick="rejectPending(${p.id})" style="padding:7px 12px;background:transparent;border:1px solid var(--lose);color:var(--lose);border-radius:7px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">❌ 却下</button>
@@ -466,7 +481,7 @@ function renderHome(){
 
       return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="font-size:10px;color:var(--text2);">${dStr}　${p.season||''} G.C.P LEAGUE</div>
-        <div style="font-size:14px;font-weight:700;margin-top:2px;">${p.teamX} <span style="color:var(--text2);font-weight:400">vs</span> ${p.teamY}</div>
+        <div style="font-size:14px;font-weight:700;margin-top:2px;">${esc(p.teamX)} <span style="color:var(--text2);font-weight:400">vs</span> ${esc(p.teamY)}</div>
         ${statusHtml}
       </div>`;
     }).join('');
@@ -482,7 +497,7 @@ function renderHome(){
 
   c.innerHTML = `
     <div style="padding:4px 0 12px;">
-      <div style="font-size:16px;font-weight:900;color:var(--accent);">${team ? '👋 おかえり、'+team+'！' : '🏆 GCP T.E.D. LEAGUE'}</div>
+      <div style="font-size:16px;font-weight:900;color:var(--accent);">${team ? '👋 おかえり、'+esc(team)+'！' : '🏆 GCP T.E.D. LEAGUE'}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:2px;">${dateStr}</div>
     </div>
 
@@ -549,7 +564,7 @@ function renderHistory(){
         }
       } else {
         statusText = '⏳ 承認待ち';
-        if(sx && !sy) statusText += `（${p.teamX}が申請済み）`;
+        if(sx && !sy) statusText += `（${esc(p.teamX)}が申請済み）`;
         if(isAdmin){
           actionHtml = `<div style="display:flex;gap:6px;margin-top:6px;">
             <button onclick="forceApprovePending(${p.id})" style="padding:5px 10px;background:var(--win);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">✅ 承認</button>
@@ -568,7 +583,7 @@ function renderHistory(){
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
           <div>
             <div style="font-size:10px;color:var(--text2);">${dStr}　${p.season||''} G.C.P LEAGUE</div>
-            <div style="font-size:14px;font-weight:700;margin-top:2px;">${p.teamX} <span style="color:var(--text2);font-weight:400">vs</span> ${p.teamY}</div>
+            <div style="font-size:14px;font-weight:700;margin-top:2px;">${esc(p.teamX)} <span style="color:var(--text2);font-weight:400">vs</span> ${esc(p.teamY)}</div>
           </div>
           <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--text2);">${scoreDisp}</div>
         </div>
@@ -598,7 +613,7 @@ function renderHistory(){
         const rPart = p.rating
           ? `${flightBadge(p.rating, isCr)}<span class="chip-rating">${p.rating}</span>`
           : `<span class="chip-no-rating">未入力</span>`;
-        return `<span class="player-chip"><span class="chip-name">${p.name}</span>${rPart}</span>`;
+        return `<span class="player-chip"><span class="chip-name">${esc(p.name)}</span>${rPart}</span>`;
       }).join('');
       return `<div class="detail-game-row">
         <div class="detail-game-top">
@@ -612,8 +627,8 @@ function renderHistory(){
     return `<div class="history-card" onclick="toggleDetail(${m.id})">
       <div class="hist-top">
         <div>
-          <div class="hist-date">${m.date}　${m.season||''} G.C.P LEAGUE</div>
-          <div class="hist-teams">${m.teamA} <span style="color:var(--text2);font-weight:400">vs</span> ${m.teamB}</div>
+          <div class="hist-date">${esc(m.date)}　${esc(m.season||'')} G.C.P LEAGUE</div>
+          <div class="hist-teams">${esc(m.teamA)} <span style="color:var(--text2);font-weight:400">vs</span> ${esc(m.teamB)}</div>
         </div>
         <div style="text-align:right">
           <div class="hist-score w">${m.scoreA} - ${m.scoreB}</div>
@@ -696,7 +711,7 @@ function renderTeams(){
       if(isEditing){
         return `<div class="member-row editing" id="inline-row-${i}-${pi}" style="display:block;">
           <div style="display:grid;grid-template-columns:1fr 80px;gap:8px;align-items:center;">
-            <input class="inline-name-input" id="inline-name-${i}-${pi}" value="${p.name}" placeholder="選手${pi+1}">
+            <input class="inline-name-input" id="inline-name-${i}-${pi}" value="${esc(p.name)}" placeholder="選手${pi+1}">
             <select class="inline-rating-sel" id="inline-rating-${i}-${pi}">${ratingOptions(p.rating)}</select>
           </div>
           <button class="inline-save-btn" onclick="saveInlineEdit(${i},${pi})">✓ 保存</button>
@@ -714,7 +729,7 @@ function renderTeams(){
       }
       return `<div class="member-row" onclick="${isDeleteMode?'':(`startInlineEdit(${i},${pi})`)}" style="${isDeleteMode?'grid-template-columns:28px 1fr 70px;':''}">
         ${delBtn}
-        <span class="member-name">${p.name}</span>
+        <span class="member-name">${esc(p.name)}</span>
         <span style="display:flex;align-items:center;gap:5px;justify-content:flex-end;">
           ${p.rating ? `<span class="member-rating-val">Rt.${p.rating}</span>` : '<span class="member-no-rating">未登録</span>'}
         </span>
@@ -726,7 +741,7 @@ function renderTeams(){
 
     return `<div class="team-card">
       <div class="team-card-head">
-        <div class="team-card-name">${t.name}</div>
+        <div class="team-card-name">${esc(t.name)}</div>
         <div style="display:flex;gap:6px;">
           ${(currentUser && (currentUser.isAdmin || (currentUser.team===t.name))) ? `
           <button class="edit-btn" onclick="addPlayerInline(${i})">＋ 追加</button>

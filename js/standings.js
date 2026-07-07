@@ -26,11 +26,11 @@ function renderRobin(){
     stats[b].wins!==stats[a].wins ? stats[b].wins-stats[a].wins : stats[b].lw-stats[a].lw
   );
   let h = '<div class="robin-wrap"><table class="robin-table"><thead><tr><th>TEAM</th>';
-  sorted.forEach((t,i)=>{ h+=`<th>${["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"][i]||i+1}<br><small>${t}</small></th>`; });
+  sorted.forEach((t,i)=>{ h+=`<th>${["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"][i]||i+1}<br><small>${esc(t)}</small></th>`; });
   h += '<th>勝</th><th>負</th><th>LEG勝</th><th>LEG負</th><th>順位</th></tr></thead><tbody>';
   sorted.forEach((team,ri)=>{
     const s=stats[team]; const rank=ri+1;
-    h += `<tr><td class="tn">${team}</td>`;
+    h += `<tr><td class="tn">${esc(team)}</td>`;
     sorted.forEach(opp=>{
       if(opp===team){h+='<td class="self-cell"></td>';return;}
       const ms=s.vs[opp]||[];
@@ -263,8 +263,8 @@ function renderStats(){
       return `<div style="margin-bottom:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--surface2);">
           <div>
-            <span style="font-size:10px;color:var(--text2);">${mh.date}</span>
-            <span style="font-size:12px;font-weight:700;margin-left:8px;">vs ${mh.opp}</span>
+            <span style="font-size:10px;color:var(--text2);">${esc(mh.date)}</span>
+            <span style="font-size:12px;font-weight:700;margin-left:8px;">vs ${esc(mh.opp)}</span>
           </div>
           <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:${matchWon?'var(--win)':'var(--lose)'};">${mh.myScore}-${mh.oppScore}</span>
         </div>
@@ -275,7 +275,7 @@ function renderStats(){
     const pid = safeId(ps.name);
     return `<div class="stat-player-card">
       <div class="stat-player-head" onclick="togglePlayerDetail('pd-${pid}')" style="cursor:pointer;">
-        <div class="stat-player-name">${ps.name}</div>
+        <div class="stat-player-name">${esc(ps.name)}</div>
         <div style="display:flex;align-items:center;gap:10px;">
           ${(()=>{
             const avg = v => v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : null;

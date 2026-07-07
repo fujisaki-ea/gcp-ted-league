@@ -55,24 +55,24 @@ function renderSchedule(){
     if(!s.teamA && !s.teamB && s.note && s.note.includes('決勝')){
       return `<div class="sch-item" style="border:2px solid var(--gold);background:rgba(170,136,0,0.07);">
         <div class="sch-date" style="font-weight:700;">${dateDisp}（${dayOfWeek}）${holiday}</div>
-        <div style="font-size:18px;font-weight:700;color:var(--gold);padding:4px 0;letter-spacing:2px;">${s.note}</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:2px;">📍 ${s.venue||'GCP'}</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold);padding:4px 0;letter-spacing:2px;">${esc(s.note)}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px;">📍 ${esc(s.venue||'GCP')}</div>
       </div>`;
     }
     if(!s.teamA && !s.teamB){
       return `<div class="sch-item" style="opacity:0.5;background:var(--bg2);">
         <div class="sch-date">${dateDisp}（${dayOfWeek}）${holiday}</div>
-        <div style="font-size:14px;color:var(--text2);padding:4px 0;">${s.note||'😴 全チームお休み'}</div>
+        <div style="font-size:14px;color:var(--text2);padding:4px 0;">${esc(s.note||'😴 全チームお休み')}</div>
       </div>`;
     }
-    const venueHtml = s.venue ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">🏠 ${s.home}　📍 ${s.venue}</div>` : '';
+    const venueHtml = s.venue ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">🏠 ${esc(s.home)}　📍 ${esc(s.venue)}</div>` : '';
     return `<div class="${cls}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div class="sch-date ${isPast?'past':''}">${dateDisp}（${dayOfWeek}）${holiday}${todayBadge}</div>
-          <div class="sch-note" style="font-size:11px;color:var(--accent);margin-bottom:2px;">${s.note||''}</div>
+          <div class="sch-note" style="font-size:11px;color:var(--accent);margin-bottom:2px;">${esc(s.note||'')}</div>
           <div class="sch-teams">
-            ${s.teamA} <span class="sch-vs">VS</span> ${s.teamB}
+            ${esc(s.teamA)} <span class="sch-vs">VS</span> ${esc(s.teamB)}
           </div>
           ${venueHtml}
           ${resultBadge}

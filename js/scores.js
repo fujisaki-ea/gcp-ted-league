@@ -108,8 +108,8 @@ function buildTodayMemberUI(){
   wrap.innerHTML = allMembers.map(m=>{
     const sel = todayMembers.includes(m.name);
     return `<label style="display:inline-flex;align-items:center;padding:5px 11px;border:1px solid ${sel?'var(--accent)':'var(--border)'};border-radius:20px;font-size:12px;cursor:pointer;margin:2px;background:${sel?'var(--accent)':'transparent'};color:${sel?'#fff':'var(--text1)'};">
-      <input type="checkbox" style="display:none;" value="${m.name}" ${sel?'checked':''} onchange="onTodayMemberChange(this)">
-      ${m.name}
+      <input type="checkbox" style="display:none;" value="${esc(m.name)}" ${sel?'checked':''} onchange="onTodayMemberChange(this)">
+      ${esc(m.name)}
     </label>`;
   }).join('');
   updateTodayMemberCount();
@@ -1059,7 +1059,7 @@ function showResultSummary(myTeam, oppTeam, myWins, oppWins, games){
     : '<span style="color:var(--lose)">試合終了</span>';
   document.getElementById('mc-body').innerHTML = `
     <div class="result-summary">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">${myTeam} vs ${oppTeam}</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">${esc(myTeam)} vs ${esc(oppTeam)}</div>
       <div class="result-summary-score ${won?'won':'lost'}">${myWins} - ${oppWins}</div>
       <div class="result-summary-label ${won?'won':'lost'}">${won?'WIN！':'LOSE'}</div>
     </div>
