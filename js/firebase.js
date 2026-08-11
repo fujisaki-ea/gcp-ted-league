@@ -22,7 +22,6 @@ const auth = getAuth(app);
 signInAnonymously(auth).catch(e => console.error('Anonymous auth error:', e));
 const db = getDatabase(app);
 const dataRef = ref(db, 'gcpLeague');
-const pwRef = ref(db, 'passwords');
 
 const pendingRef  = ref(db, 'gcpLeague/pendingMatches');
 const matchesRef  = ref(db, 'gcpLeague/matches');
@@ -199,75 +198,56 @@ onValue(dataRef, (snapshot) => {
   if(retryBtn) retryBtn.style.display = 'inline-block';
 });
 
-// チーム名変更時にパスワードキーを付け替える（ハッシュはそのまま移行）
+// チーム名変更時にパスワードキーを付け替える（管理者パスワードでの認証が必要）
 window.fbRenamePasswordKey = async function(oldTeam, newTeam) {
+  const authPassword = window.prompt('パスワード引き継ぎのため、管理者パスワードを入力してください');
+  if(!authPassword) return;
   try {
-    const snapshot = await get(pwRef);
-    if(!snapshot.exists()) return;
-    const passwords = snapshot.val();
-    if(!passwords[oldTeam]) return;
-    const hash = passwords[oldTeam];
-    delete passwords[oldTeam];
-    passwords[newTeam] = hash;
-    await set(pwRef, passwords);
+    const res = await fetch(`${PW_API_BASE}/rename-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldTeam, newTeam, authPassword }),
+    });
+    const data = res.ok ? await res.json() : { ok: false };
+    if(!data.ok && typeof toast === 'function') toast('⚠️ パスワードの引き継ぎに失敗しました（後で管理者パネルから再設定してください）');
   } catch(e) {
     console.error('fbRenamePasswordKey error:', e);
   }
 };
 
-// パスワードをSHA-256でハッシュ化
-async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + 'gcp-ted-salt-2026');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+// パスワード照合・保存はVercel API経由（passwordsノードはクライアントから直接読み書きしない）
+const PW_API_BASE = 'https://gcp-ted-league-api.vercel.app/api';
 
-// Firebaseからパスワードハッシュを取得して照合
 window.fbCheckPassword = async function(team, password) {
   try {
-    const snapshot = await get(pwRef);
-    if(!snapshot.exists()) return false;
-    const passwords = snapshot.val();
-    const storedHash = passwords[team];
-    if(!storedHash) return false;
-    const inputHash = await hashPassword(password);
-    return inputHash === storedHash;
+    const res = await fetch(`${PW_API_BASE}/check-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team, password }),
+    });
+    if(!res.ok) return false;
+    const data = await res.json();
+    return !!data.ok;
   } catch(e) {
     console.error('Password check error:', e);
     return false;
   }
 };
 
-// パスワードをハッシュ化してFirebaseに保存
-window.fbSavePassword = async function(team, password) {
+// authTeam/authPassword: 本人の現在パスワード、または管理者(__admin__)のパスワード
+window.fbSavePassword = async function(team, newPassword, authTeam, authPassword) {
   try {
-    const hash = await hashPassword(password);
-    const snapshot = await get(pwRef);
-    const current = snapshot.exists() ? snapshot.val() : {};
-    current[team] = hash;
-    await set(pwRef, current);
-    return true;
+    const res = await fetch(`${PW_API_BASE}/set-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team, newPassword, authTeam, authPassword }),
+    });
+    if(!res.ok) return false;
+    const data = await res.json();
+    return !!data.ok;
   } catch(e) {
     console.error('Password save error:', e);
     return false;
-  }
-};
-
-// 初回：ソースコードのパスワードをFirebaseに移行
-window.fbMigratePasswords = async function(passwords) {
-  try {
-    const snapshot = await get(pwRef);
-    if(snapshot.exists()) return; // 既に移行済み
-    const hashed = {};
-    for(const [team, pw] of Object.entries(passwords)) {
-      hashed[team] = await hashPassword(pw);
-    }
-    await set(pwRef, hashed);
-    console.log('Passwords migrated to Firebase');
-  } catch(e) {
-    console.error('Migration error:', e);
   }
 };
 

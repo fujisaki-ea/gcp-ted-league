@@ -165,11 +165,14 @@ function changePassword(teamName, idx){
   if(!input || !input.value){ toast('新しいパスワードを入力してください'); return; }
   const newPw = input.value.trim();
   if(newPw.length < 4){ toast('パスワードは4文字以上にしてください'); return; }
+  const adminAuthInput = document.getElementById('pw-admin-auth');
+  const adminAuth = adminAuthInput ? adminAuthInput.value : '';
+  if(!adminAuth){ toast('管理者パスワード（確認用）を入力してください'); return; }
   const label = teamName==='__admin__' ? '管理者' : teamName;
   showConfirm('🔐 パスワード変更', `${label} のパスワードを変更しますか？`, async ()=>{
     if(window.fbSavePassword) {
-      const ok = await window.fbSavePassword(teamName, newPw);
-      if(!ok) { toast('❌ 保存に失敗しました'); return; }
+      const ok = await window.fbSavePassword(teamName, newPw, '__admin__', adminAuth);
+      if(!ok) { toast('❌ 保存に失敗しました（管理者パスワードをご確認ください）'); return; }
     }
     toast(`${label} のパスワードを変更しました`); input.value='';
   }, '変更する');
@@ -197,17 +200,12 @@ async function changeSelfPassword(){
   if(!newPw)           { err.textContent = '新しいパスワードを入力してください'; return; }
   if(newPw.length < 4) { err.textContent = '4文字以上で入力してください'; return; }
   if(newPw !== newPw2) { err.textContent = '新しいパスワードが一致しません'; return; }
-
-  err.textContent = '🔄 確認中...';
-  const currentOk = window.fbCheckPassword ? await window.fbCheckPassword(team, current) : false;
-  err.textContent = '';
-  if(!currentOk) { err.textContent = '現在のパスワードが違います'; return; }
   if(newPw === current) { err.textContent = '現在と同じパスワードは使えません'; return; }
 
   showConfirm('🔑 パスワード変更', `${team} のパスワードを変更しますか？`, async ()=>{
     if(window.fbSavePassword) {
-      const ok = await window.fbSavePassword(team, newPw);
-      if(!ok) { toast('❌ 保存に失敗しました'); return; }
+      const ok = await window.fbSavePassword(team, newPw, team, current);
+      if(!ok) { toast('❌ 現在のパスワードが違うか、保存に失敗しました'); return; }
     }
     document.getElementById('pw-current').value = '';
     document.getElementById('pw-new').value = '';
