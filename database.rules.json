@@ -11,6 +11,10 @@
     "backups": {
       ".read": "auth != null",
       ".write": "auth != null"
+    },
+    "rateLimits": {
+      ".read": "auth.uid === 'ZuKj3J6yb9fvbrHzc0W1xoIDJt42'",
+      ".write": "auth.uid === 'ZuKj3J6yb9fvbrHzc0W1xoIDJt42'"
     }
   }
 }

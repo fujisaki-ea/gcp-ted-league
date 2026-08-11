@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, update, push, remove, onValue, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -23,149 +23,102 @@ signInAnonymously(auth).catch(e => console.error('Anonymous auth error:', e));
 const db = getDatabase(app);
 const dataRef = ref(db, 'gcpLeague');
 
-const pendingRef  = ref(db, 'gcpLeague/pendingMatches');
-const matchesRef  = ref(db, 'gcpLeague/matches');
-const notifsRef   = ref(db, 'gcpLeague/rejectedNotifs');
-const backupsRef  = ref(db, 'backups');
+// 書き込みは全てサーバーAPI経由。クライアントはgcpLeagueノードを直接書き換えない（読み取りのみ）。
+const API_BASE = 'https://gcp-ted-league-api.vercel.app/api';
 
-// チームのみ部分更新（pendingMatches/matches/rejectedNotifs/schedule は上書きしない）
+async function apiCall(action, payload) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (window._sessionToken) headers['Authorization'] = `Bearer ${window._sessionToken}`;
+  const res = await fetch(`${API_BASE}/db`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action, payload }),
+  });
+  const data = await res.json().catch(() => ({ ok: false }));
+  if (!res.ok || !data.ok) {
+    throw new Error((data && data.error) || `api ${action} failed: ${res.status}`);
+  }
+  return data;
+}
+
+// チームのみ部分更新（自チーム or 管理者のみサーバー側で許可）
 window.fbSave = function(data) {
-  const payload = {};
-  if(data.teams !== undefined) payload.teams = data.teams;
-  update(dataRef, payload)
+  if (data.teams === undefined) return Promise.resolve();
+  return apiCall('saveTeams', { teams: data.teams })
     .then(() => {
       const badge = document.getElementById('sync-badge');
       if(badge){ badge.textContent='✅ 保存済み'; badge.className='sync-badge ok'; badge.style.opacity='1'; setTimeout(()=>{ badge.style.opacity='0'; }, 2000); }
     })
-    .catch(() => {
+    .catch((e) => {
+      console.error('fbSave error:', e);
       const badge = document.getElementById('sync-badge');
       if(badge){ badge.textContent='❌ 保存失敗'; badge.className='sync-badge err'; badge.style.opacity='1'; }
+      throw e;
     });
 };
 
-// pendingMatches: atomic push（競合なし）
+// pendingMatches
 window.fbPushPending = async function(record) {
   const clean = Object.fromEntries(Object.entries(record).filter(([k])=>k!=='_fbKey'));
-  const r = await push(pendingRef, clean);
-  return r.key;
+  const { fbKey } = await apiCall('pushPending', { record: clean });
+  return fbKey;
 };
 window.fbUpdatePending = function(fbKey, data) {
-  return update(ref(db, 'gcpLeague/pendingMatches/' + fbKey), data);
+  return apiCall('updatePending', { fbKey, data });
 };
 window.fbRemovePending = function(fbKey) {
-  return remove(ref(db, 'gcpLeague/pendingMatches/' + fbKey));
+  return apiCall('removePending', { fbKey });
 };
 
-// 自動バックアップ（backups/YYYYMMDD に matches + teams を保存、7日分保持）
-window.fbAutoBackup = async function(force = false) {
-  try {
-    const _d = new Date();
-    const today = `${_d.getFullYear()}${String(_d.getMonth()+1).padStart(2,'0')}${String(_d.getDate()).padStart(2,'0')}`;
-    const backupPath = ref(db, `backups/${today}`);
-    if(!force) {
-      const existing = await get(backupPath);
-      if(existing.exists()) return;
-    }
-    const [matchSnap, teamSnap] = await Promise.all([
-      get(matchesRef),
-      get(ref(db, 'gcpLeague/teams'))
-    ]);
-    await set(backupPath, {
-      matches: matchSnap.exists() ? matchSnap.val() : {},
-      teams:   teamSnap.exists()  ? teamSnap.val()  : {},
-      savedAt: Date.now()
-    });
-    // 7日以上前のバックアップを削除
-    const allSnap = await get(backupsRef);
-    if(allSnap.exists()) {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 180);
-      const cutoffKey = `${cutoff.getFullYear()}${String(cutoff.getMonth()+1).padStart(2,'0')}${String(cutoff.getDate()).padStart(2,'0')}`;
-      for(const k of Object.keys(allSnap.val())) {
-        if(k < cutoffKey) await remove(ref(db, `backups/${k}`));
-      }
-    }
-  } catch(e) {
-    console.error('Auto backup error:', e);
-  }
+// pending解決系（相互一致照合・強制承認・72時間タイムアウト自動承認・却下）
+window.fbSubmitOpponentResult = function(fbKey, submissionY) {
+  return apiCall('submitOpponentResult', { fbKey, submissionY });
+};
+window.fbForceApprovePending = function(fbKey) {
+  return apiCall('forceApprovePending', { fbKey });
+};
+window.fbResolveTimeoutPending = function(fbKey) {
+  return apiCall('resolveTimeoutPending', { fbKey });
+};
+window.fbRejectPending = function(fbKey) {
+  return apiCall('rejectPending', { fbKey });
 };
 
-// teamRenames: チーム名変更マップを保存（例: {ハッチ: サカエ}）
+// teamRenames
 window.fbSaveTeamRenames = function(renames) {
-  if(!renames || Object.keys(renames).length === 0) {
-    return set(ref(db, 'gcpLeague/teamRenames'), null);
-  }
-  return set(ref(db, 'gcpLeague/teamRenames'), renames);
+  return apiCall('saveTeamRenames', { renames });
 };
 
-// schedule extras: デフォルト以外の日程を保存
+// schedule extras
 window.fbSaveScheduleExtras = function(items) {
-  if(!items || !items.length) {
-    return set(ref(db, 'gcpLeague/schedule'), null);
-  }
-  const obj = {};
-  items.forEach(item => { obj[item.id] = item; });
-  return set(ref(db, 'gcpLeague/schedule'), obj);
+  return apiCall('saveSchedule', { items });
 };
 
-// matches: atomic push
+// matches（管理者専用）
 window.fbPushMatch = async function(record) {
   const clean = Object.fromEntries(Object.entries(record).filter(([k])=>k!=='_fbKey'));
-  const r = await push(matchesRef, clean);
-  fbAutoBackup(true); // 試合追加後に強制バックアップ
-  return r.key;
+  const { fbKey } = await apiCall('pushMatch', { record: clean });
+  return fbKey;
 };
 window.fbUpdateMatch = function(fbKey, data) {
-  return update(ref(db, 'gcpLeague/matches/' + fbKey), data);
+  return apiCall('updateMatch', { fbKey, data });
 };
 window.fbRemoveMatch = function(fbKey) {
-  return remove(ref(db, 'gcpLeague/matches/' + fbKey));
+  return apiCall('removeMatch', { fbKey });
 };
 window.fbClearMatches = function() {
-  return set(matchesRef, null);
+  return apiCall('clearMatches', {});
 };
 
 // rejectedNotifs
-window.fbPushNotif = async function(record) {
-  const clean = Object.fromEntries(Object.entries(record).filter(([k])=>k!=='_fbKey'));
-  const r = await push(notifsRef, clean);
-  return r.key;
-};
-// pendingMatchをatomicにclaimする（複数クライアントの二重承認防止）
-// status が 'pending' のときだけ 'approving' にCAS。成功した1クライアントだけtrueを返す。
-window.fbClaimPendingApproval = async function(fbKey) {
-  if(!fbKey) return true; // fbKeyなし（オフライン等）は通過させる
-  try {
-    const pendRef = ref(db, 'gcpLeague/pendingMatches/' + fbKey);
-    const result = await runTransaction(pendRef, (current) => {
-      if(current === null) return; // 既に削除済み → abort
-      if(current.status === 'approving' || current.status === 'approved') return; // 他クライアントが先行 → abort
-      return { ...current, status: 'approving' };
-    });
-    return result.committed;
-  } catch(e) {
-    console.error('fbClaimPendingApproval error:', e);
-    return false;
-  }
-};
-
 window.fbUpdateNotif = function(fbKey, data) {
-  return update(ref(db, 'gcpLeague/rejectedNotifs/' + fbKey), data);
+  return apiCall('updateNotif', { fbKey, data });
 };
 window.fbRemoveNotif = function(fbKey) {
-  return remove(ref(db, 'gcpLeague/rejectedNotifs/' + fbKey));
+  return apiCall('dismissNotif', { fbKey });
 };
-// _fbKey が不明な場合のフォールバック：id で検索して削除
-window.fbRemoveNotifById = async function(id) {
-  const snapshot = await get(notifsRef);
-  if(!snapshot.exists()) return;
-  const data = snapshot.val();
-  for(const [key, val] of Object.entries(data)) {
-    if(val.id === id) {
-      await remove(ref(db, 'gcpLeague/rejectedNotifs/' + key));
-      return;
-    }
-  }
+window.fbRemoveNotifById = function(id) {
+  return apiCall('dismissNotif', { id });
 };
 
 // onValueで初回データ取得 → オーバーレイを消す → 以降もリアルタイム同期
@@ -185,7 +138,6 @@ onValue(dataRef, (snapshot) => {
       renderRobin(); renderHistory(); renderSchedule();
       renderTeams(); refreshTeamSelects(); refreshStatsTeamSel(); renderHome();
     }
-    fbAutoBackup(); // 1日1回バックアップ（当日分がなければ作成）
   }
 }, (error) => {
   // 接続エラー時
@@ -203,7 +155,7 @@ window.fbRenamePasswordKey = async function(oldTeam, newTeam) {
   const authPassword = window.prompt('パスワード引き継ぎのため、管理者パスワードを入力してください');
   if(!authPassword) return;
   try {
-    const res = await fetch(`${PW_API_BASE}/rename-password`, {
+    const res = await fetch(`${API_BASE}/rename-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ oldTeam, newTeam, authPassword }),
@@ -216,17 +168,16 @@ window.fbRenamePasswordKey = async function(oldTeam, newTeam) {
 };
 
 // パスワード照合・保存はVercel API経由（passwordsノードはクライアントから直接読み書きしない）
-const PW_API_BASE = 'https://gcp-ted-league-api.vercel.app/api';
-
 window.fbCheckPassword = async function(team, password) {
   try {
-    const res = await fetch(`${PW_API_BASE}/check-password`, {
+    const res = await fetch(`${API_BASE}/check-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ team, password }),
     });
     if(!res.ok) return false;
     const data = await res.json();
+    if(data.ok && data.token) window._sessionToken = data.token;
     return !!data.ok;
   } catch(e) {
     console.error('Password check error:', e);
@@ -237,7 +188,7 @@ window.fbCheckPassword = async function(team, password) {
 // authTeam/authPassword: 本人の現在パスワード、または管理者(__admin__)のパスワード
 window.fbSavePassword = async function(team, newPassword, authTeam, authPassword) {
   try {
-    const res = await fetch(`${PW_API_BASE}/set-password`, {
+    const res = await fetch(`${API_BASE}/set-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ team, newPassword, authTeam, authPassword }),

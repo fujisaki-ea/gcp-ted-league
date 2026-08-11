@@ -35,7 +35,7 @@ async function doLogin(){
   err.textContent = '';
   const isAdmin = team === '__admin__';
   currentUser = {team: isAdmin ? null : team, isAdmin, isGuest: false};
-  sessionStorage.setItem('gcpSession', JSON.stringify({team, isAdmin}));
+  sessionStorage.setItem('gcpSession', JSON.stringify({team, isAdmin, token: window._sessionToken || null}));
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('hdr-login-btn').style.display = 'none';
   const badge = document.getElementById('hdr-login-badge');
@@ -84,7 +84,7 @@ async function quickLoginSubmit(){
   errEl.textContent = '';
   document.getElementById('modal-quick-login').classList.remove('open');
   currentUser = {team, isAdmin:false, isGuest:false};
-  sessionStorage.setItem('gcpSession', JSON.stringify({team, isAdmin:false}));
+  sessionStorage.setItem('gcpSession', JSON.stringify({team, isAdmin:false, token: window._sessionToken || null}));
   const badge = document.getElementById('hdr-login-badge');
   badge.textContent = team + ' ✕';
   badge.style.display = 'inline-block';
@@ -117,6 +117,7 @@ function doLogout(){
   showConfirm('ログアウト', 'ログアウトしますか？', ()=>{
     sessionStorage.removeItem('gcpSession');
     sessionStorage.removeItem('gcpView');
+    window._sessionToken = null;
     clearScoreFormUI();
     const sc = document.getElementById('stats-content');
     if(sc) sc.innerHTML = '<div class="empty-state"><div class="ico">📊</div><p>チームを選択してください</p></div>';
@@ -164,7 +165,7 @@ function changePassword(teamName, idx){
   const input = document.getElementById('pw-input-' + idx);
   if(!input || !input.value){ toast('新しいパスワードを入力してください'); return; }
   const newPw = input.value.trim();
-  if(newPw.length < 4){ toast('パスワードは4文字以上にしてください'); return; }
+  if(newPw.length < 6){ toast('パスワードは6文字以上にしてください'); return; }
   const adminAuthInput = document.getElementById('pw-admin-auth');
   const adminAuth = adminAuthInput ? adminAuthInput.value : '';
   if(!adminAuth){ toast('管理者パスワード（確認用）を入力してください'); return; }
@@ -198,7 +199,7 @@ async function changeSelfPassword(){
 
   if(!current)         { err.textContent = '現在のパスワードを入力してください'; return; }
   if(!newPw)           { err.textContent = '新しいパスワードを入力してください'; return; }
-  if(newPw.length < 4) { err.textContent = '4文字以上で入力してください'; return; }
+  if(newPw.length < 6) { err.textContent = '6文字以上で入力してください'; return; }
   if(newPw !== newPw2) { err.textContent = '新しいパスワードが一致しません'; return; }
   if(newPw === current) { err.textContent = '現在と同じパスワードは使えません'; return; }
 

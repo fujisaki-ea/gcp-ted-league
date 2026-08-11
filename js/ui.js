@@ -121,9 +121,6 @@ function statsInput(isCricket, savedVal='', disabled=false) {
 let D = {teams:[], matches:[], pendingMatches:[], rejectedNotifs:[]};
 let currentUser = null;  // {team, isAdmin, isGuest}
 
-// パスワードはFirebaseにSHA-256ハッシュで保存・照合
-const PASSWORDS = {}; // 平文パスワードは保持しない
-
 // ── データ保存 ──
 function updateSyncBadge(state){
   const badge = document.getElementById('sync-badge');
@@ -1138,9 +1135,6 @@ async function init(){
 
   const startSync = () => {
     window._appReady = true;
-    if(window.fbMigratePasswords) {
-      window.fbMigratePasswords(PASSWORDS);
-    }
     if(window._fbLatestData !== undefined) {
       const overlay = document.getElementById('fb-connecting-overlay');
       if(overlay) overlay.style.display = 'none';
@@ -1155,7 +1149,8 @@ async function init(){
     const savedSession = sessionStorage.getItem('gcpSession');
     if(savedSession) {
       try {
-        const {team, isAdmin} = JSON.parse(savedSession);
+        const {team, isAdmin, token} = JSON.parse(savedSession);
+        window._sessionToken = token || null;
         currentUser = {team: isAdmin ? null : team, isAdmin, isGuest: false};
         const overlay = document.getElementById('fb-connecting-overlay');
         if(overlay) overlay.style.display = 'none';
