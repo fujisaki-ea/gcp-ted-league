@@ -5,8 +5,8 @@
       ".write": "auth != null"
     },
     "passwords": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth.uid === 'ZuKj3J6yb9fvbrHzc0W1xoIDJt42'",
+      ".write": "auth.uid === 'ZuKj3J6yb9fvbrHzc0W1xoIDJt42'"
     },
     "backups": {
       ".read": "auth != null",
