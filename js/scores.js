@@ -756,14 +756,14 @@ function cancelPending(id){
   } else if(p.teamY===team && p.submissionY){
     showConfirm('🗑️ 申請を取り消す', `${p.date} ${p.teamX} vs ${p.teamY} の申請を取り消しますか？`, async ()=>{
       try{
+        // サーバー成功後にローカルへ反映（失敗時はローカルを変更しない）
+        if(window.fbUpdatePending && p._fbKey) await window.fbUpdatePending(p._fbKey, {submissionY:null, status:'pending'});
         p.submissionY = null;
         p.status = 'pending';
-        if(window.fbUpdatePending && p._fbKey) await window.fbUpdatePending(p._fbKey, {submissionY:null, status:'pending'});
         try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
         renderHome(); renderHistory();
         toast('申請を取り消しました');
       }catch(e){
-        p.submissionY = null;  // ローカルは巻き戻す
         toast('❌ 取り消しに失敗しました。接続を確認してください');
       }
     }, '取り消す');
@@ -861,16 +861,16 @@ async function resubmitConflict(id){
       async ()=>{
         try{
           const submission = p.submissionY;
-          p.submissionY = null;
-          p.status = 'pending';
+          // サーバー成功後にローカルへ反映（失敗時はローカルを変更しない）
           if(window.fbUpdatePending && p._fbKey){
             await window.fbUpdatePending(p._fbKey, {submissionY:null, status:'pending'});
           }
+          p.submissionY = null;
+          p.status = 'pending';
           try{ sessionStorage.setItem('gcpLeague', JSON.stringify(D)); }catch(e){}
           renderHome();
           prefillScoreFormWithSubmission(team, p.teamX, p.date, p.season, submission);
         }catch(e){
-          p.submissionY = null;
           toast('❌ 操作に失敗しました。接続を確認してください');
         }
       }, '修正する');
@@ -929,7 +929,7 @@ function showResultSummary(myTeam, oppTeam, myWins, oppWins, games){
     const label = isForfeit ? '不戦敗' : (myWin ? 'MY WIN' : 'OPP WIN');
     return `<div style="display:flex;justify-content:space-between;align-items:center;
         padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">
-      <span style="color:var(--text2);">${g.game}G　${g.label}</span>
+      <span style="color:var(--text2);">${esc(g.game)}G　${esc(g.label)}</span>
       <span style="font-weight:700;color:${color};font-size:11px;letter-spacing:1px;">${label}</span>
     </div>`;
   }).join('');

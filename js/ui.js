@@ -407,7 +407,8 @@ function renderHome(){
     const myTeam = team;
     const isAdmin = currentUser.isAdmin;
 
-    const myNotifs = isAdmin ? [] : notifs.filter(n=>n.teamX===myTeam||n.teamY===myTeam);
+    // 宛先チームの通知のみ表示（forTeamのない旧却下通知の宛先は申請側のteamX）
+    const myNotifs = isAdmin ? [] : notifs.filter(n=>(n.forTeam||n.teamX)===myTeam);
     const notifsHtml = myNotifs.map(n=>{
       const isConflict = n.type === 'conflict';
       const bg    = isConflict ? 'rgba(255,153,0,.08)' : 'rgba(240,51,85,.08)';
@@ -477,7 +478,7 @@ function renderHome(){
       }
 
       return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-        <div style="font-size:10px;color:var(--text2);">${dStr}　${p.season||''} G.C.P LEAGUE</div>
+        <div style="font-size:10px;color:var(--text2);">${dStr}　${esc(p.season||'')} G.C.P LEAGUE</div>
         <div style="font-size:14px;font-weight:700;margin-top:2px;">${esc(p.teamX)} <span style="color:var(--text2);font-weight:400">vs</span> ${esc(p.teamY)}</div>
         ${statusHtml}
       </div>`;
@@ -579,7 +580,7 @@ function renderHistory(){
       return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
           <div>
-            <div style="font-size:10px;color:var(--text2);">${dStr}　${p.season||''} G.C.P LEAGUE</div>
+            <div style="font-size:10px;color:var(--text2);">${dStr}　${esc(p.season||'')} G.C.P LEAGUE</div>
             <div style="font-size:14px;font-weight:700;margin-top:2px;">${esc(p.teamX)} <span style="color:var(--text2);font-weight:400">vs</span> ${esc(p.teamY)}</div>
           </div>
           <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--text2);">${scoreDisp}</div>
@@ -608,15 +609,15 @@ function renderHistory(){
       const loseTeam = g.winner==='my' ? m.teamB : m.teamA;
       const chips = (g.players||[]).map(p=>{
         const rPart = p.rating
-          ? `${flightBadge(p.rating, isCr)}<span class="chip-rating">${p.rating}</span>`
+          ? `${flightBadge(p.rating, isCr)}<span class="chip-rating">${esc(p.rating)}</span>`
           : `<span class="chip-no-rating">未入力</span>`;
         return `<span class="player-chip"><span class="chip-name">${esc(p.name)}</span>${rPart}</span>`;
       }).join('');
       return `<div class="detail-game-row">
         <div class="detail-game-top">
-          <span class="detail-gnum">${g.game}G</span>
-          <span class="detail-gtype">${g.label}</span>
-          <span class="detail-result"><span class="dr-win">${winTeam} WIN</span><span class="dr-sep">·</span><span class="dr-lose">${loseTeam} LOSE</span></span>
+          <span class="detail-gnum">${esc(g.game)}G</span>
+          <span class="detail-gtype">${esc(g.label)}</span>
+          <span class="detail-result"><span class="dr-win">${esc(winTeam)} WIN</span><span class="dr-sep">·</span><span class="dr-lose">${esc(loseTeam)} LOSE</span></span>
         </div>
         <div class="player-chips">${chips||'<span style="color:var(--text2);font-size:11px;">選手未入力</span>'}</div>
       </div>`;
@@ -728,7 +729,7 @@ function renderTeams(){
         ${delBtn}
         <span class="member-name">${esc(p.name)}</span>
         <span style="display:flex;align-items:center;gap:5px;justify-content:flex-end;">
-          ${p.rating ? `<span class="member-rating-val">Rt.${p.rating}</span>` : '<span class="member-no-rating">未登録</span>'}
+          ${p.rating ? `<span class="member-rating-val">Rt.${esc(p.rating)}</span>` : '<span class="member-no-rating">未登録</span>'}
         </span>
       </div>`;
     }).join('');
@@ -908,7 +909,7 @@ function renderMemberRows(members){
     const val = isDefault ? '' : m.name;
     const ph  = isDefault ? (m.name || `選手${i+1}`) : '選手名';
     return `<div class="modal-member-row">
-      <input  type="text" class="no-mb mm-name"   value="${val}" placeholder="${ph}">
+      <input  type="text" class="no-mb mm-name"   value="${esc(val)}" placeholder="${esc(ph)}">
       <select class="no-mb mm-rating">${ratingOptions(m.rating||'')}</select>
       <button class="del-member-btn" onclick="removeMemberRow(this)">×</button>
     </div>`;
@@ -929,7 +930,7 @@ function removeMemberRow(btn){
   const c=document.getElementById('mt-members');
   if(c.children.length>1) btn.closest('.modal-member-row').remove();
 }
-function saveTeamModal(){
+async function saveTeamModal(){
   const name = document.getElementById('mt-name').value.trim();
   if(!name){toast('チーム名を入力してください');return;}
   const players = [...document.querySelectorAll('#mt-members .modal-member-row')].map(r=>({
@@ -938,69 +939,56 @@ function saveTeamModal(){
   })).filter(p=>p.name);
   if(editingTeamIdx===null){
     if(D.teams.find(t=>t.name===name)){toast('同じ名前のチームが既にあります');return;}
-    D.teams.push({name,players});
-    // 新チームの初期パスワードを設定
+    // 初期パスワード設定が成功してからチームを追加する（ログインできないチームを作らない）
     if(window.fbSavePassword) {
-      window.fbSavePassword(name, '123456').then(ok=>{
-        if(ok) toast(`${name} を追加しました（初期パスワード: 123456）`);
-        else   toast(`❌ パスワード設定に失敗しました。管理者から再設定してください`);
-      }).catch(()=>{
-        toast(`❌ パスワード設定に失敗しました。管理者から再設定してください`);
-      });
-    } else {
-      toast(`${name} を追加しました（初期パスワード: 123456）`);
+      const ok = await window.fbSavePassword(name, '123456');
+      if(!ok){ toast('❌ チームの追加に失敗しました（パスワード設定エラー）'); return; }
     }
+    D.teams.push({name,players});
+    toast(`${name} を追加しました（初期パスワード: 123456）`);
   } else {
     const oldName = D.teams[editingTeamIdx].name;
-    D.teams[editingTeamIdx] = {name, players};
     if(oldName !== name){
-      // matches のチーム名を更新
-      (D.matches||[]).forEach(m=>{
-        const upd={};
-        if(m.teamA===oldName){ m.teamA=name; upd.teamA=name; }
-        if(m.teamB===oldName){ m.teamB=name; upd.teamB=name; }
-        if(Object.keys(upd).length && m._fbKey && window.fbUpdateMatch)
-          window.fbUpdateMatch(m._fbKey, upd);
+      if(D.teams.some((t,i)=>i!==editingTeamIdx && t.name===name)){toast('同じ名前のチームが既にあります');return;}
+      // teamRenames マップを更新（連鎖リネーム対応・自己マッピング除去）
+      const renames = {...(D.teamRenames||{})};
+      Object.keys(renames).forEach(orig => {
+        if(renames[orig] === oldName) renames[orig] = name;
       });
-      // pendingMatches のチーム名を更新
-      (D.pendingMatches||[]).forEach(p=>{
-        const upd={};
-        if(p.teamX===oldName){ p.teamX=name; upd.teamX=name; }
-        if(p.teamY===oldName){ p.teamY=name; upd.teamY=name; }
-        if(Object.keys(upd).length && p._fbKey && window.fbUpdatePending)
-          window.fbUpdatePending(p._fbKey, upd);
-      });
-      // rejectedNotifs のチーム名を更新
-      (D.rejectedNotifs||[]).forEach(n=>{
-        const upd={};
-        if(n.teamX===oldName){ n.teamX=name; upd.teamX=name; }
-        if(n.teamY===oldName){ n.teamY=name; upd.teamY=name; }
-        if(n.forTeam===oldName){ n.forTeam=name; upd.forTeam=name; }
-        if(Object.keys(upd).length && n._fbKey && window.fbUpdateNotif)
-          window.fbUpdateNotif(n._fbKey, upd);
-      });
-      // teamRenames マップを更新して Firebase に保存（小さいデータ、レース条件なし）
-      if(!D.teamRenames) D.teamRenames = {};
-      // 連鎖リネーム対応: 既存エントリで oldName が値になっているものを更新
-      Object.keys(D.teamRenames).forEach(orig => {
-        if(D.teamRenames[orig] === oldName) D.teamRenames[orig] = name;
-      });
-      // ORIGINAL に oldName が含まれていれば直接マッピングを追加
       if(ORIGINAL_SCHEDULE_2026.some(d=>d.teamA===oldName||d.teamB===oldName||d.home===oldName)){
-        D.teamRenames[oldName] = name;
+        renames[oldName] = name;
       }
-      // 自己マッピング除去（A→A は不要）
-      Object.keys(D.teamRenames).forEach(k=>{ if(D.teamRenames[k]===k) delete D.teamRenames[k]; });
-      if(window.fbSaveTeamRenames) window.fbSaveTeamRenames(D.teamRenames);
+      Object.keys(renames).forEach(k=>{ if(renames[k]===k) delete renames[k]; });
+      // 試合・申請・通知・日程・パスワードキーはサーバー側で一括更新する（成功してからローカル反映）
+      try{
+        await window.fbRenameTeam(oldName, name, renames);
+      }catch(e){
+        toast('❌ チーム名の変更に失敗しました。接続を確認してください');
+        return;
+      }
+      D.teams[editingTeamIdx] = {name, players};
+      (D.matches||[]).forEach(m=>{
+        if(m.teamA===oldName) m.teamA=name;
+        if(m.teamB===oldName) m.teamB=name;
+      });
+      (D.pendingMatches||[]).forEach(p=>{
+        if(p.teamX===oldName) p.teamX=name;
+        if(p.teamY===oldName) p.teamY=name;
+      });
+      (D.rejectedNotifs||[]).forEach(n=>{
+        if(n.teamX===oldName) n.teamX=name;
+        if(n.teamY===oldName) n.teamY=name;
+        if(n.forTeam===oldName) n.forTeam=name;
+      });
+      D.teamRenames = renames;
       // D.schedule を ORIGINAL + teamRenames で再構築
       const _rSave = D.teamRenames;
       const _apRSave = s => { const tA=_rSave[s.teamA]||s.teamA,tB=_rSave[s.teamB]||s.teamB,h=_rSave[s.home]||s.home; return (tA!==s.teamA||tB!==s.teamB||h!==s.home)?{...s,teamA:tA,teamB:tB,home:h}:s; };
       const _extras = (D.schedule||[]).filter(s=>!ORIGINAL_SCHEDULE_2026.some(d=>String(d.id)===String(s.id)));
       D.schedule = [...ORIGINAL_SCHEDULE_2026.map(_apRSave), ..._extras.map(_apRSave)];
-      // パスワードキーを付け替え
-      if(window.fbRenamePasswordKey) window.fbRenamePasswordKey(oldName, name);
       toast(`「${oldName}」→「${name}」に変更しました`);
     } else {
+      D.teams[editingTeamIdx] = {name, players};
       toast(`${name} を更新しました`);
     }
   }

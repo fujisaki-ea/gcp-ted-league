@@ -243,7 +243,7 @@ function renderStats(){
       const r=d.games>0?Math.round(d.wins/d.games*100):0;
       const cls=statWrClass(r);
       return `<div class="stat-game-type-row">
-        <span class="stat-game-type-name">${label}</span>
+        <span class="stat-game-type-name">${esc(label)}</span>
         <span>
           <span class="stat-winrate ${cls}">${r}%</span>
           ${statBar(r)}
@@ -257,7 +257,7 @@ function renderStats(){
       const matchWon = mh.myScore > mh.oppScore;
       const gameRows = mh.games.map(g=>`
         <div style="display:flex;justify-content:space-between;padding:4px 8px;font-size:11px;border-bottom:1px solid var(--border);">
-          <span style="color:var(--text2);">${g.game}G　${g.label}</span>
+          <span style="color:var(--text2);">${esc(g.game)}G　${esc(g.label)}</span>
           <span style="font-weight:700;color:${g.win?'var(--win)':'var(--lose)'};">${g.win?'WIN':'LOSE'}</span>
         </div>`).join('');
       return `<div style="margin-bottom:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">

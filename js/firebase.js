@@ -84,6 +84,11 @@ window.fbRejectPending = function(fbKey) {
   return apiCall('rejectPending', { fbKey });
 };
 
+// チーム名変更（関連データ・パスワードキーをサーバー側で一括更新）
+window.fbRenameTeam = function(oldName, newName, teamRenames) {
+  return apiCall('renameTeam', { oldName, newName, teamRenames });
+};
+
 // teamRenames
 window.fbSaveTeamRenames = function(renames) {
   return apiCall('saveTeamRenames', { renames });
@@ -185,16 +190,27 @@ window.fbCheckPassword = async function(team, password) {
   }
 };
 
-// authTeam/authPassword: 本人の現在パスワード、または管理者(__admin__)のパスワード
+// authTeam/authPassword: 本人の現在パスワード、または管理者(__admin__)のパスワード。
+// 省略時は管理者セッショントークンで認可する（新規チームの初期パスワード設定用）。
 window.fbSavePassword = async function(team, newPassword, authTeam, authPassword) {
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (window._sessionToken) headers['Authorization'] = `Bearer ${window._sessionToken}`;
     const res = await fetch(`${API_BASE}/set-password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ team, newPassword, authTeam, authPassword }),
     });
     if(!res.ok) return false;
     const data = await res.json();
+    // 自分のパスワードを変えると旧トークンは無効になるため、新トークンに差し替える
+    if(data.ok && data.token) {
+      window._sessionToken = data.token;
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('gcpSession') || 'null');
+        if(saved) sessionStorage.setItem('gcpSession', JSON.stringify({ ...saved, token: data.token }));
+      } catch(e) {}
+    }
     return !!data.ok;
   } catch(e) {
     console.error('Password save error:', e);
